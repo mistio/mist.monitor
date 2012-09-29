@@ -4,4 +4,5 @@ eggs
 develop-eggs
 bin
 .project
+.installed.cfg
 *.egg-info
