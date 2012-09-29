@@ -1,0 +1,7 @@
+parts
+var
+eggs
+develop-eggs
+bin
+.project
+*.egg-info
