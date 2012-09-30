@@ -57,7 +57,7 @@ def add_machine(request):
     # include the new file in the main config
     config_include = "conf/collectd_%s.conf" % uuid
     f = open("conf/collectd.conf", "a")
-    f.writelines(['\ninclude "%s"'% config_include])
+    f.write('\nInclude "%s"\n'% config_include)
     f.close()
 
     call(['/usr/bin/pkill','-HUP','collectd'])
