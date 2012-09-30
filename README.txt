@@ -9,5 +9,9 @@ $ sudo aptitude install python-dev flex yacc autoheader automake autoconf libtoo
 $ python bootstrap.py
 $ ./bin/buildout
 
-install collectd-graphite by hand as explained here:
-https://github.com/joemiller/collectd-graphite
+
+graphite is installed, just needs syncdb to be run manually
+$ ./bin/graphite syncdb --settings=graphite.settings
+
+(install collectd-graphite by hand as explained here:https://github.com/joemiller/collectd-graphite)
+
