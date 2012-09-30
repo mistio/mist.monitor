@@ -46,3 +46,10 @@ directory = ${buildout:directory}/bin
 priority = 40
 redirect_stderr = false
 
+[program:graphite]
+command = ${buildout:directory}/bin/graphite runserver --settings=graphite.settings
+process_name = graphite
+directory = ${buildout:directory}/bin
+priority = 50
+redirect_stderr = false
+
