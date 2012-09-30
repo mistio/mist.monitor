@@ -1,0 +1,48 @@
+
+[supervisord]
+childlogdir = ${buildout:directory}/var/log
+logfile = ${buildout:directory}/var/log/supervisord.log
+logfile_maxbytes = 50MB
+logfile_backups = 10
+loglevel = info
+pidfile = ${buildout:directory}/var/supervisord.pid
+umask = 022
+nodaemon = false
+nocleanup = false
+environment = LD_LIBRARY_PATH=${buildout:directory}/parts/mongo-c-driver/lib,PERL5LIB=${buildout:directory}/parts/collectd/lib/perl5/:${buildout:directory}/parts/collectd-graphite/lib/perl5/
+
+[inet_http_server]
+port = 127.0.0.1:9001
+username = mistiera
+password = 
+
+[supervisorctl]
+serverurl = http://127.0.0.1:9001
+username = mistiera
+password = 
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory=supervisor.rpcinterface:make_main_rpcinterface
+
+[program:gunicorn]
+command = ${buildout:directory}/bin/gunicorn_paster ${buildout:directory}/production.ini
+process_name = gunicorn
+directory = ${buildout:directory}/bin
+priority = 10
+redirect_stderr = false
+
+[program:collectd]
+command =  ${buildout:directory}/parts/collectd/sbin/collectd -f -C ${buildout:directory}/conf/collectd.conf
+process_name = collectd
+directory = ${buildout:directory}/parts/collectd/sbin
+priority = 20
+redirect_stderr = false
+
+
+[program:mongodb]
+command = ${buildout:directory}/bin/mongod --dbpath ${buildout:directory}/var/data --master --directoryperdb
+process_name = mongodb
+directory = ${buildout:directory}/bin
+priority = 40
+redirect_stderr = false
+

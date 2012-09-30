@@ -6,3 +6,6 @@ bin
 .project
 .installed.cfg
 *.egg-info
+*.pyc
+.mr.developer.cfg
+downloads

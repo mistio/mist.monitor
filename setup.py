@@ -14,6 +14,8 @@ long_description = (
     open('CHANGES.txt').read()
     + '\n')
 
+requires = ['pyramid', 'PasteScript',]
+
 setup(name='mist.monitor',
       version=version,
       description="Monitoring node for the https://mist.io service",
@@ -33,11 +35,10 @@ setup(name='mist.monitor',
       namespace_packages=['mist'],
       include_package_data=True,
       zip_safe=False,
-      install_requires=[
-          'setuptools',
-          # -*- Extra requirements: -*-
-      ],
+      install_requires= requires,
       entry_points="""
       # -*- Entry points: -*-
+      [paste.app_factory]
+      main = mist.monitor:main
       """,
       )
