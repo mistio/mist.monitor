@@ -1,6 +1,8 @@
 import os
 from subprocess import call
 
+import requests
+
 from pyramid.view import view_config
 from pyramid.response import Response
 
@@ -118,6 +120,9 @@ def get_stats(request):
     targets = ["cpu", "load", "memory", "disk"]
 
     uuid = request.params.get('uuid', None)
+    if not uuid:
+        log.error("cannot find uuid -- are you really looking for stats?")
+        return False
     changes_since = request.params.get('changes_since', None)
     if not changes_since:
         changes_since = "-2hours&"
@@ -141,6 +146,8 @@ def get_stats(request):
 
         r = requests.get(uri)
 
+        if not len(r.json):
+            continue
         for i in range (0, len(r.json[0]['datapoints'])):
             value = r.json[0]['datapoints'][i][0]
             if value:
