@@ -28,17 +28,20 @@ def add_machine(request):
         return Response('Unauthorized', 401)
 
     # check if uuid already in pass file
-    f = open("conf/collectd.machines")
-    res = f.read()
-    f.close()
-    if uuid in res:
-        return Response('Conflict', 409)
-
-    # append collectd pw file
-    f = open("conf/collectd.machines", 'a')
-    f.writelines(['\n'+ uuid + ': ' + passwd])
-    f.close()
-
+    try:
+        f = open("conf/collectd.machines")
+        res = f.read()
+        f.close()
+        if uuid in res:
+            return Response('Conflict', 409)
+        
+        # append collectd pw file
+        f = open("conf/collectd.machines", 'a')
+        f.writelines(['\n'+ uuid + ': ' + passwd])
+        f.close()        
+    except Exception as e:
+        log.error('Error opening machines pw file: %s' % e)
+        return Response('Service unavailable', 503)
 
     # create new collectd conf section for allowing machine stats
     config_append = """
@@ -53,20 +56,74 @@ def add_machine(request):
             Target stop
         </Chain>""" % (uuid, uuid, uuid)
 
-    f = open("conf/collectd_%s.conf"%uuid,"w")
-    f.write(config_append)
-    f.close()
-
-    # include the new file in the main config
-    config_include = "conf/collectd_%s.conf" % uuid
-    f = open("conf/collectd.conf", "a")
-    f.write('\nInclude "%s"\n'% config_include)
-    f.close()
-
-    call(['/usr/bin/pkill','-HUP','collectd'])
+    try:
+        f = open("conf/collectd_%s.conf"%uuid,"w")
+        f.write(config_append)
+        f.close()
+    
+        # include the new file in the main config
+        config_include = "conf/collectd_%s.conf" % uuid
+        f = open("conf/collectd.conf", "a")
+        f.write('\nInclude "%s"\n'% config_include)
+        f.close()
+    except Exception as e:
+        log.error('Error opening collectd conf files: %s' % e)
+        return Response('Service unavailable', 503)
+    
+    try:
+        call(['/usr/bin/pkill','-HUP','collectd'])
+    except Exception as e:
+        log.error('Error restarting collectd: %s' % e)
 
     return {}
 
+
+@view_config(route_name='machine', request_method='DELETE', renderer='json')
+def remove_machine(request):
+    """ remove machine from monitored list """
+    # get request params
+    uuid = request.params.get('uuid', None)
+
+    # check for errors
+    if not uuid:
+        return Response('Bad Request', 400)
+      
+    try:
+        f = open("conf/collectd.machines")
+        res = f.read()
+        f.close()
+        if uuid not in res:
+           return Response('Not Found', 404)
+        lines = split(res)
+        for l in lines:
+            if uuid in l:
+                lines.remove(l)
+        res = '\n' .join(lines)
+        f = open("conf/collectd.machines",'w')
+        f.write(res)
+        f.close()
+    except Exception as e:
+        log.error('Error opening machines pw file: %s' % e)
+        return Response('Service unavailable', 503)
+    
+    try:
+        f = open("conf/collectd.conf")
+        res = f.read()
+        f.close()
+        if uuid not in res:
+           return Response('Not Found', 404)
+        lines = split(res)
+        for l in lines:
+            if uuid in l:
+                lines.remove(l)
+        res = '\n' .join(lines)
+        f = open("conf/collectd.conf",'w')
+        f.write(res)
+        f.close()
+    except Exception as e:
+        log.error('Error opening collectd conf file: %s' % e)
+        return Response('Service unavailable', 503)
+            
 
 @view_config(route_name='teststats', request_method='GET', renderer='json')
 def get_teststats(request):
