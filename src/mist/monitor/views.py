@@ -14,7 +14,8 @@ from random import gauss
 
 from time import time
 
-from pymongo import Connection, pymongo
+from pymongo import Connection
+import pymongo
 
 log = getLogger('mist.core')
 
