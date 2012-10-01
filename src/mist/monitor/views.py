@@ -178,6 +178,59 @@ def get_teststats(request):
     return ret
 
 
+@view_config(route_name='mongostats', request_method='GET', renderer='json')
+def get_mongostats(request):
+    """Get stats for this machine using the mongodb backend. Data is stored using a
+    different format than the other get_stats functions, following the targets template
+    below
+    """
+
+    targets = {"cpu": ['idle','interrupt','nice','softirq','steal','system','user','wait'],
+    "load": 'v',
+    "memory": ['buffered', 'cached', 'free', 'used'], "disk": ['merged','octets','ops','time'] }
+
+    mongodb_hostname = 'localhost'
+    mongodb_port = 27017
+    mongodb_name = 'collectd'
+    # get request params
+    try:
+        uuid = request.matchdict['machine']
+
+        # check for errors
+        if not uuid:
+            log.error("cannot find uuid %s" % uuid)
+            raise
+    except Exception as e:
+        return Response('Bad Request', 400)
+
+
+    changes_since = request.params.get('changes_since', None)
+    if not changes_since:
+        changes_since = "-1hours&"
+    else:
+        changes_since = "%d" %(int(float(changes_since)/1000))
+
+    connection = Connection(mongodb_hostname, mongodb_port)
+    db = connection[mongodb_name]
+
+    ret = { }
+    for k in range(0, len(targets.keys())):
+        key = targets.keys()[k]
+        query_dict = {'host': uuid }
+        my_target = db[key].find(query_dict).sort('$natural', pymongo.DESCENDING).limit(len(targets[key]))
+        ret[key] = {}
+        for l in range(0, len(targets[key])):
+            inner = targets[key][l]
+            ret[key][inner] = my_target[l]['values']
+
+    timestamp = time() * 1000
+    ret['timestamp'] = timestamp
+    ret['interval'] = interval
+
+    log.info(ret)
+    return ret
+
+
 @view_config(route_name='stats', request_method='GET', renderer='json')
 def get_stats(request):
     """Get all stats for this machine, the client will draw them
