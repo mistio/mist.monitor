@@ -128,7 +128,7 @@ def remove_machine(request):
             if uuid in l:
                 lines.remove(l)
         res = '\n' .join(lines)
-        f = open("conf/collectd.conf",'w')
+        f = open("conf/collectd.conf.local",'w')
         f.write(res)
         f.close()
     except Exception as e:

@@ -8,6 +8,7 @@ bin
 *.egg-info
 *.pyc
 .mr.developer.cfg
+.pydevproject
 downloads
 conf/collectd.conf
 conf/collectd.conf.local
