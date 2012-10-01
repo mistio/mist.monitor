@@ -9,3 +9,6 @@ bin
 *.pyc
 .mr.developer.cfg
 downloads
+conf/collectd.conf
+conf/collectd.conf.local
+conf/collectd.passwd

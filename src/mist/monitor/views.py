@@ -1,5 +1,9 @@
 import os
+
+from logging import getLogger
+
 from subprocess import call
+import math
 
 import requests
 
@@ -8,9 +12,13 @@ from pyramid.response import Response
 
 from random import gauss
 
+from time import time
+
+log = getLogger('mist.core')
+
 @view_config(route_name='machines', request_method='GET', renderer='json')
 def list_machines(request):
-    file = open(os.getcwd()+'/conf/collectd.machines')
+    file = open(os.getcwd()+'/conf/collectd.passwd')
     machines = file.read().split('\n')
     return machines
 
@@ -29,14 +37,14 @@ def add_machine(request):
 
     # check if uuid already in pass file
     try:
-        f = open("conf/collectd.machines")
+        f = open("conf/collectd.passwd")
         res = f.read()
         f.close()
         if uuid in res:
             return Response('Conflict', 409)
         
         # append collectd pw file
-        f = open("conf/collectd.machines", 'a')
+        f = open("conf/collectd.passwd", 'a')
         f.writelines(['\n'+ uuid + ': ' + passwd])
         f.close()        
     except Exception as e:
@@ -63,7 +71,7 @@ def add_machine(request):
     
         # include the new file in the main config
         config_include = "conf/collectd_%s.conf" % uuid
-        f = open("conf/collectd.conf", "a")
+        f = open("conf/collectd.conf.local", "a")
         f.write('\nInclude "%s"\n'% config_include)
         f.close()
     except Exception as e:
@@ -82,24 +90,27 @@ def add_machine(request):
 def remove_machine(request):
     """ remove machine from monitored list """
     # get request params
-    uuid = request.params.get('uuid', None)
+    try:
+        uuid = request.matchdict['machine']
 
-    # check for errors
-    if not uuid:
+        # check for errors
+        if not uuid:
+            raise
+    except Exception as e:
         return Response('Bad Request', 400)
       
     try:
-        f = open("conf/collectd.machines")
+        f = open("conf/collectd.passwd")
         res = f.read()
         f.close()
         if uuid not in res:
            return Response('Not Found', 404)
-        lines = split(res)
+        lines = res.split('\n')
         for l in lines:
             if uuid in l:
                 lines.remove(l)
         res = '\n' .join(lines)
-        f = open("conf/collectd.machines",'w')
+        f = open("conf/collectd.passwd",'w')
         f.write(res)
         f.close()
     except Exception as e:
@@ -107,12 +118,12 @@ def remove_machine(request):
         return Response('Service unavailable', 503)
     
     try:
-        f = open("conf/collectd.conf")
+        f = open("conf/collectd.conf.local")
         res = f.read()
         f.close()
         if uuid not in res:
            return Response('Not Found', 404)
-        lines = split(res)
+        lines = res.split('\n')
         for l in lines:
             if uuid in l:
                 lines.remove(l)
@@ -176,13 +187,23 @@ def get_stats(request):
     #FIXME: default targets -- could be user customizable
     targets = ["cpu", "load", "memory", "disk"]
 
-    uuid = request.params.get('uuid', None)
-    if not uuid:
-        log.error("cannot find uuid -- are you really looking for stats?")
-        return False
+    # get request params
+    try:
+        uuid = request.matchdict['machine']
+
+        # check for errors
+        if not uuid:
+            log.error("cannot find uuid %s" % uuid)
+            raise
+    except Exception as e:
+        return Response('Bad Request', 400)
+
+
     changes_since = request.params.get('changes_since', None)
     if not changes_since:
-        changes_since = "-2hours&"
+        changes_since = "-1hours&"
+    else:
+        changes_since = "%d" %(int(float(changes_since)/1000))
 
     data_format = request.params.get('format', None)
     if not data_format:
@@ -193,18 +214,24 @@ def get_stats(request):
     graphite_uri = "http://experiment.unweb.me:8080"
 
     data = {'cpu': [ ], 'load':  [ ], 'memory': [ ], 'disk': [ ] }
-    interval = 5000
+    interval = 1000
 
     for target in targets:
         target_uri = "target=servers." + uuid + "." + target + "*.*.*&"
-        time_range = "from=" + changes_since + "until=now"
+        time_range = "from=%s&until=now" %(changes_since)
         #construct uri
         uri = graphite_uri + "/render?" + data_format + target_uri + time_range
+        print uri
 
         r = requests.get(uri)
+        if r.status_code == 200:
+            log.info("connect OK")
+        else:
+            log.error("Status code = %d" %(r.status_code))
 
         if not len(r.json):
             continue
+        
         for i in range (0, len(r.json[0]['datapoints'])):
             value = r.json[0]['datapoints'][i][0]
             if value:
@@ -222,4 +249,5 @@ def get_stats(request):
            'memory': data['memory'],
            'disk': data['disk']}
 
+    log.info(ret)
     return ret

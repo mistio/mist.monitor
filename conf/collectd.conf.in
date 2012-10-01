@@ -32,7 +32,7 @@ LoadPlugin write_mongodb
 	# client setup:
 	<Listen "88.198.158.14" "25826">
 		SecurityLevel Encrypt
-		AuthFile "${buildout:directory}/conf/collectd.machines"
+		AuthFile "${buildout:directory}/conf/collectd.passwd"
 		Interface "eth0"
 	</Listen>
 	MaxPacketSize 1024
@@ -73,3 +73,6 @@ LoadPlugin write_mongodb
 		StoreRates false
 	</Node>
 </Plugin>
+
+Include "collectd.conf.local"
+
