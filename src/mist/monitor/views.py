@@ -14,6 +14,8 @@ from random import gauss
 
 from time import time
 
+from pymongo import Connection, pymongo
+
 log = getLogger('mist.core')
 
 @view_config(route_name='machines', request_method='GET', renderer='json')
@@ -204,6 +206,7 @@ def get_mongostats(request):
         return Response('Bad Request', 400)
 
 
+    interval = 5000 # in milliseconds
     changes_since = request.params.get('changes_since', None)
     if not changes_since:
         changes_since = "-1hours&"
