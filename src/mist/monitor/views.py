@@ -213,6 +213,9 @@ def get_mongostats(request):
     step = int(request.params.get('step', 60000))
     start = int(request.params.get('start', stop - step))
 
+    if not expression:
+        expression = targets.keys()
+
     connection = Connection(mongodb_hostname, mongodb_port)
     db = connection[mongodb_name]
     step = int(step/1000)
