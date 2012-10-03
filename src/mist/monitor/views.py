@@ -16,6 +16,7 @@ from time import time
 
 from pymongo import Connection
 import pymongo
+from datetime import datetime
 
 log = getLogger('mist.core')
 
@@ -206,30 +207,39 @@ def get_mongostats(request):
     except Exception as e:
         return Response('Bad Request', 400)
 
-
-    interval = 5000 # in milliseconds
-    changes_since = request.params.get('changes_since', None)
-    if not changes_since:
-        changes_since = "-1hours&"
-    else:
-        changes_since = "%d" %(int(float(changes_since)/1000))
+    expression = request.params.get('expression', None)
+    start = request.params.get('start', None)
+    stop = request.params.get('stop', None)
+    step = request.params.get('step', None)
+    if not step:
+        step = 60000
 
     connection = Connection(mongodb_hostname, mongodb_port)
     db = connection[mongodb_name]
 
     ret = { }
-    for k in range(0, len(targets.keys())):
-        key = targets.keys()[k]
-        query_dict = {'host': uuid }
+    for key in targets.keys():
+        if key not in expression:
+            continue
+        if not stop:
+            stop = time()
+        if not start:
+            start = stop - float(step)
+        query_dict = {'host': uuid,
+                      'time': {"$gte": datetime.fromtimestamp(start),
+                               "$lt": datetime.fromtimestamp(stop) }}
+        print query_dict
         my_target = db[key].find(query_dict).sort('$natural', pymongo.DESCENDING).limit(len(targets[key]))
         ret[key] = {}
+	if not my_target.count():
+            break
         for l in range(0, len(targets[key])):
             inner = targets[key][l]
             ret[key][inner] = my_target[l]['values']
 
     timestamp = time() * 1000
     ret['timestamp'] = timestamp
-    ret['interval'] = interval
+    ret['interval'] = step
 
     log.info(ret)
     return ret
