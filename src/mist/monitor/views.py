@@ -17,6 +17,8 @@ from time import time
 from pymongo import Connection
 import pymongo
 from datetime import datetime
+from operator import *
+
 
 log = getLogger('mist.core')
 
@@ -187,11 +189,10 @@ def get_mongostats(request):
     """Get stats for this machine using the mongodb backend. Data is stored using a
     different format than the other get_stats functions, following the targets template
     below
-    """
 
-    targets = {"cpu": ['idle','interrupt','nice','softirq','steal','system','user','wait'],
-    "load": 'v',
-    "memory": ['buffered', 'cached', 'free', 'used'], "disk": ['merged','octets','ops','time'] }
+    FIXME: We get a float division error sometimes. This may be due to our total_diff
+    array handling or something else. We need to figure this out ASAP.
+    """
 
     mongodb_hostname = 'localhost'
     mongodb_port = 27017
@@ -207,41 +208,74 @@ def get_mongostats(request):
     except Exception as e:
         return Response('Bad Request', 400)
 
-    expression = request.params.get('expression', None)
-    start = request.params.get('start', None)
-    stop = request.params.get('stop', None)
-    step = request.params.get('step', None)
-    if not step:
-        step = 60000
+    expression = request.params.get('expression', ['cpu', 'load', 'memory', 'disk'])
+    stop = int(request.params.get('stop', int(time())))
+    step = int(request.params.get('step', 60000))
+    start = int(request.params.get('start', stop - step))
 
     connection = Connection(mongodb_hostname, mongodb_port)
     db = connection[mongodb_name]
+    step = int(step/1000)
 
     ret = { }
-    for key in targets.keys():
-        if key not in expression:
-            continue
-        if not stop:
-            stop = time()
-        if not start:
-            start = stop - float(step)
+
+    if expression.__class__ in [str,unicode]:
+        expression = [expression]
+
+    for col in expression:
+        res = {}
+
+        ret[col] = {'total': [],'util': [],'total_diff': [],'used_diff': [],
+                    'used' : []}
+
         query_dict = {'host': uuid,
-                      'time': {"$gte": datetime.fromtimestamp(start),
-                               "$lt": datetime.fromtimestamp(stop) }}
-        print query_dict
-        my_target = db[key].find(query_dict).sort('$natural', pymongo.DESCENDING).limit(len(targets[key]))
-        ret[key] = {}
-	if not my_target.count():
-            break
-        for l in range(0, len(targets[key])):
-            inner = targets[key][l]
-            ret[key][inner] = my_target[l]['values']
+                      'time': {"$gte": datetime.fromtimestamp(int(start)),
+                               "$lt": datetime.fromtimestamp(int(stop)) }}
+
+        #XXX: No need to use limit, we just return all values in the requested time range
+        res = db[col].find(query_dict).sort('time', pymongo.DESCENDING)
+        #.limit(2*8*(int((stop-start)/step)))
+
+        prev = None
+        set_of_cpus = []
+        for r in res:
+            curr = r['time']
+            index = r['type_instance']
+            value = r['values']
+            cpu_no = r['plugin_instance']
+            if not ret[col].get(index, None):
+                ret[col][index] = value
+            else:
+                ret[col][index].extend(value)
+
+            if cpu_no not in set_of_cpus:
+                set_of_cpus.append(cpu_no)
+
+            if prev != curr:
+                ret[col]['total'].append(0)
+                ret[col]['used'].append(0)
+
+            if index != 'idle':
+                ret[col]['used'][-1] += float(value[0])
+            ret[col]['total'][-1] += value[0]
+            prev = curr
+
+        for j in range(1, len(ret[col]['total'])):
+            i = len(ret[col]['total']) - 1 - j
+            ret[col]['total_diff'].append(abs(ret[col]['total'][i-1] - ret[col]['total'][i]))
+            ret[col]['used_diff'].append(abs(ret[col]['used'][i-1] - ret[col]['used'][i]))
+        #FIXME: the way we calculate CPU util leaves us with N-1 values to return to D3
+        #Thus, we can cheat (if step is 1, we would be left with 0 values for util.
+        #ret[col]['total_diff'].append(ret[col]['total_diff'][-1])
+        #ret[col]['used_diff'].append(ret[col]['used_diff'][-1])
+
+        ret[col]['util'] = map(div, ret[col]['used_diff'], ret[col]['total_diff'])
 
     timestamp = time() * 1000
     ret['timestamp'] = timestamp
     ret['interval'] = step
 
-    log.info(ret)
+    #log.info(ret)
     return ret
 
 
