@@ -214,6 +214,9 @@ def get_mongostats(request):
     if not step:
         step = 60000
 
+    if not expression:
+        expression = targets.keys()
+
     connection = Connection(mongodb_hostname, mongodb_port)
     db = connection[mongodb_name]
 
