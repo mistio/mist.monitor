@@ -275,9 +275,10 @@ def get_mongostats(request):
 
         ret[col]['util'] = map(div, ret[col]['used_diff'], ret[col]['total_diff'])
         util_values = len(ret[col]['util'])
+        zero_prepend = []
         if util_values < no_values_asked:
             zero_prepend = [0] * (no_values_asked - util_values)
-            zero_prepend.extend(ret[col]['util'])
+        zero_prepend.extend(ret[col]['util'])
 
     timestamp = time() * 1000
     ret['timestamp'] = timestamp
