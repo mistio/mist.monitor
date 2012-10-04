@@ -1,23 +1,22 @@
 import os
+import requests
+from subprocess import call
+from datetime import datetime
+from time import time
+
+import math
+from random import gauss
+from operator import *
 
 from logging import getLogger
-
-from subprocess import call
-import math
-
-import requests
 
 from pyramid.view import view_config
 from pyramid.response import Response
 
-from random import gauss
-
-from time import time
-
 from pymongo import Connection
 import pymongo
-from datetime import datetime
-from operator import *
+
+from mist.monitor.config import MONGODB
 
 
 log = getLogger('mist.core')
@@ -48,11 +47,11 @@ def add_machine(request):
         f.close()
         if uuid in res:
             return Response('Conflict', 409)
-        
+
         # append collectd pw file
         f = open("conf/collectd.passwd", 'a')
         f.writelines(['\n'+ uuid + ': ' + passwd])
-        f.close()        
+        f.close()
     except Exception as e:
         log.error('Error opening machines pw file: %s' % e)
         return Response('Service unavailable', 503)
@@ -74,7 +73,7 @@ def add_machine(request):
         f = open("conf/collectd_%s.conf"%uuid,"w")
         f.write(config_append)
         f.close()
-    
+
         # include the new file in the main config
         config_include = "conf/collectd_%s.conf" % uuid
         f = open("conf/collectd.conf.local", "a")
@@ -83,7 +82,7 @@ def add_machine(request):
     except Exception as e:
         log.error('Error opening collectd conf files: %s' % e)
         return Response('Service unavailable', 503)
-    
+
     try:
         call(['/usr/bin/pkill','-HUP','collectd'])
     except Exception as e:
@@ -104,7 +103,7 @@ def remove_machine(request):
             raise
     except Exception as e:
         return Response('Bad Request', 400)
-      
+
     try:
         f = open("conf/collectd.passwd")
         res = f.read()
@@ -122,7 +121,7 @@ def remove_machine(request):
     except Exception as e:
         log.error('Error opening machines pw file: %s' % e)
         return Response('Service unavailable', 503)
-    
+
     try:
         f = open("conf/collectd.conf.local")
         res = f.read()
@@ -140,13 +139,13 @@ def remove_machine(request):
     except Exception as e:
         log.error('Error opening collectd conf file: %s' % e)
         return Response('Service unavailable', 503)
-            
+
 
 @view_config(route_name='teststats', request_method='GET', renderer='json')
 def get_teststats(request):
     """Get all stats for this machine, the client will draw them
 
-    TODO: return real values 
+    TODO: return real values
     WARNING: copied from mist.core
     """
     interval = 5000 # in milliseconds
@@ -194,9 +193,9 @@ def get_mongostats(request):
     array handling or something else. We need to figure this out ASAP.
     """
 
-    mongodb_hostname = 'localhost'
-    mongodb_port = 27017
-    mongodb_name = 'collectd'
+    mongodb_hostname = MONGODB['host']
+    mongodb_port = MONGODB['port']
+    mongodb_name = MONGODB['dbname']
     # get request params
     try:
         uuid = request.matchdict['machine']
@@ -342,7 +341,7 @@ def get_stats(request):
 
         if not len(r.json):
             continue
-        
+
         for i in range (0, len(r.json[0]['datapoints'])):
             value = r.json[0]['datapoints'][i][0]
             if value:
