@@ -8,6 +8,9 @@ import math
 from random import gauss
 from operator import *
 
+import numpy
+from scipy import interpolate
+
 from logging import getLogger
 
 from pyramid.view import view_config
@@ -183,6 +186,130 @@ def get_teststats(request):
     return ret
 
 
+def get_mongocpustats_numpy(db, uuid, start, stop, step):
+
+    res = {}
+    nr_values_asked = int((stop - start)/step)
+    ret = {'total': [],'util': [],'total_diff':[] ,'used_diff': [] ,
+                'used' : [] }
+
+    query_dict = {'host': uuid,
+                  'time': {"$gte": datetime.fromtimestamp(int(start)),
+                           "$lt": datetime.fromtimestamp(int(stop)) }}
+
+    res = db.cpu.find(query_dict).sort('time', pymongo.DESCENDING)
+
+    prev = None
+    set_of_cpus = []
+    for r in res:
+        curr = r['time']
+        index = r['type_instance']
+        value = r['values']
+        cpu_no = r['plugin_instance']
+        if not ret.get(index, None):
+            ret[index] = value
+        else:
+            ret[index].extend(value)
+
+        if cpu_no not in set_of_cpus:
+            set_of_cpus.append(cpu_no)
+
+        if prev != curr:
+            ret['total'].append(0)
+            ret['used'].append(0)
+
+        if index != 'idle':
+            ret['used'][-1] += float(value[0])
+        ret['total'][-1] += value[0]
+        prev = curr
+
+    for j in range(1, len(ret['total'])):
+        i = len(ret['total']) -1 - j
+        ret['total_diff'].append  (abs(ret['total'][i-1] - ret['total'][i]))
+        ret['used_diff'].append(abs(ret['used'][i-1] - ret['used'][i]))
+
+    used_diff = numpy.array(ret['used_diff'])
+    total_diff = numpy.array(ret['total_diff'])
+    util = used_diff / total_diff
+    calc_util = util
+
+    if util.shape[0] < nr_values_asked:
+        calc_util = numpy.zeros(nr_values_asked)
+        calc_util[-util.shape[0]::] = util 
+    elif util.shape[0] > nr_values_asked:
+        x_axis = numpy.arange(util.shape[0])
+        tck = interpolate.splrep(x_axis, util)
+        new_x_axis = numpy.arange(0, util.shape[0], util.shape[0] * float(step)/(stop-start))
+        calc_util = interpolate.splev(new_x_axis, tck, der=0)
+        calc_util = numpy.abs(calc_util)
+
+    ret['util'] = list(calc_util)
+
+    return ret
+
+
+def get_mongocpustats(db, uuid, start, stop, step):
+
+    res = {}
+    nr_values_asked = int((stop - start)/step)
+    ret = {'total': [],'util': [],'total_diff':[] ,'used_diff': [] ,
+                'used' : [] }
+
+    query_dict = {'host': uuid,
+                  'time': {"$gte": datetime.fromtimestamp(int(start)),
+                           "$lt": datetime.fromtimestamp(int(stop)) }}
+
+    #XXX: No need to use limit, we just return all values in the requested time range
+    res = db.cpu.find(query_dict).sort('time', pymongo.DESCENDING)
+    #.limit(2*8*(int((stop-start)/step)))
+
+    prev = None
+    set_of_cpus = []
+    for r in res:
+        curr = r['time']
+        index = r['type_instance']
+        value = r['values']
+        cpu_no = r['plugin_instance']
+        if not ret.get(index, None):
+            ret[index] = value
+        else:
+            ret[index].extend(value)
+
+        if cpu_no not in set_of_cpus:
+            set_of_cpus.append(cpu_no)
+
+        if prev != curr:
+            ret['total'].append(0)
+            ret['used'].append(0)
+
+        if index != 'idle':
+            ret['used'][-1] += float(value[0])
+        ret['total'][-1] += value[0]
+        prev = curr
+
+    for j in range(1, len(ret['total'])):
+        i = len(ret['total']) -1 - j
+        ret['total_diff'].append  (abs(ret['total'][i-1] - ret['total'][i]))
+        ret['used_diff'].append(abs(ret['used'][i-1] - ret['used'][i]))
+    #FIXME: the way we calculate CPU util leaves us with N-1 values to return to D3
+    #Thus, we can cheat (if step is 1, we would be left with 0 values for util.
+    #ret[col]['total_diff'].append(ret[col]['total_diff'][-1])
+    #ret[col]['used_diff'].append(ret[col]['used_diff'][-1])
+
+    ret['util'] = map(div, ret['used_diff'], ret['total_diff'])
+    util_values = len(ret['util'])
+    calc_util = []
+    if util_values < nr_values_asked:
+        calc_util = [0] * (nr_values_asked - util_values)
+    calc_util.extend(ret['util'])
+
+    #timestamp = time() * 1000
+    #ret['timestamp'] = timestamp
+    #ret['interval'] = step
+
+    ret['util'] = calc_util
+    return ret
+
 @view_config(route_name='mongostats', request_method='GET', renderer='json')
 def get_mongostats(request):
     """Get stats for this machine using the mongodb backend. Data is stored using a
@@ -218,7 +345,7 @@ def get_mongostats(request):
     connection = Connection(mongodb_hostname, mongodb_port)
     db = connection[mongodb_name]
     step = int(step/1000)
-    no_values_asked = int((stop - start)/step)
+    nr_values_asked = int((stop - start)/step)
 
     ret = { }
 
@@ -226,64 +353,11 @@ def get_mongostats(request):
         expression = [expression]
 
     for col in expression:
-        res = {}
+        #if col == 'cpu':
+        #    ret[col] = get_mongocpustats(db, uuid, start, stop, step)
+        if col == 'cpu':
+            ret[col] = get_mongocpustats_numpy(db, uuid, start, stop, step)
 
-        ret[col] = {'total': [],'util': [],'total_diff':[] ,'used_diff': [] ,
-                    'used' : [] }
-
-        query_dict = {'host': uuid,
-                      'time': {"$gte": datetime.fromtimestamp(int(start)),
-                               "$lt": datetime.fromtimestamp(int(stop)) }}
-
-        #XXX: No need to use limit, we just return all values in the requested time range
-        res = db[col].find(query_dict).sort('time', pymongo.DESCENDING)
-        #.limit(2*8*(int((stop-start)/step)))
-
-        prev = None
-        set_of_cpus = []
-        for r in res:
-            curr = r['time']
-            index = r['type_instance']
-            value = r['values']
-            cpu_no = r['plugin_instance']
-            if not ret[col].get(index, None):
-                ret[col][index] = value
-            else:
-                ret[col][index].extend(value)
-
-            if cpu_no not in set_of_cpus:
-                set_of_cpus.append(cpu_no)
-
-            if prev != curr:
-                ret[col]['total'].append(0)
-                ret[col]['used'].append(0)
-
-            if index != 'idle':
-                ret[col]['used'][-1] += float(value[0])
-            ret[col]['total'][-1] += value[0]
-            prev = curr
-
-        for j in range(1, len(ret[col]['total'])):
-            i = len(ret[col]['total']) -1 - j
-            ret[col]['total_diff'].append  (abs(ret[col]['total'][i-1] - ret[col]['total'][i]))
-            ret[col]['used_diff'].append(abs(ret[col]['used'][i-1] - ret[col]['used'][i]))
-        #FIXME: the way we calculate CPU util leaves us with N-1 values to return to D3
-        #Thus, we can cheat (if step is 1, we would be left with 0 values for util.
-        #ret[col]['total_diff'].append(ret[col]['total_diff'][-1])
-        #ret[col]['used_diff'].append(ret[col]['used_diff'][-1])
-
-        ret[col]['util'] = map(div, ret[col]['used_diff'], ret[col]['total_diff'])
-        util_values = len(ret[col]['util'])
-        zero_prepend = []
-        if util_values < no_values_asked:
-            zero_prepend = [0] * (no_values_asked - util_values)
-        zero_prepend.extend(ret[col]['util'])
-
-    timestamp = time() * 1000
-    ret['timestamp'] = timestamp
-    ret['interval'] = step
-
-    ret[col]['util'] = zero_prepend
     #log.info(ret)
     return ret
 

@@ -14,7 +14,7 @@ long_description = (
     open('CHANGES.txt').read()
     + '\n')
 
-requires = ['pyramid', 'PasteScript', 'requests', 'pymongo']
+requires = ['pyramid', 'PasteScript', 'requests', 'pymongo', 'numpy', 'scipy==0.10.0']
 
 setup(name='mist.monitor',
       version=version,
