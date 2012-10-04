@@ -219,6 +219,7 @@ def get_mongostats(request):
     connection = Connection(mongodb_hostname, mongodb_port)
     db = connection[mongodb_name]
     step = int(step/1000)
+    no_values_asked = int((stop - start)/step)
 
     ret = { }
 
@@ -228,8 +229,8 @@ def get_mongostats(request):
     for col in expression:
         res = {}
 
-        ret[col] = {'total': [],'util': [],'total_diff': [],'used_diff': [],
-                    'used' : []}
+        ret[col] = {'total': [],'util': [],'total_diff':[] ,'used_diff': [] ,
+                    'used' : [] }
 
         query_dict = {'host': uuid,
                       'time': {"$gte": datetime.fromtimestamp(int(start)),
@@ -264,8 +265,8 @@ def get_mongostats(request):
             prev = curr
 
         for j in range(1, len(ret[col]['total'])):
-            i = len(ret[col]['total']) - 1 - j
-            ret[col]['total_diff'].append(abs(ret[col]['total'][i-1] - ret[col]['total'][i]))
+            i = len(ret[col]['total']) -1 - j
+            ret[col]['total_diff'].append  (abs(ret[col]['total'][i-1] - ret[col]['total'][i]))
             ret[col]['used_diff'].append(abs(ret[col]['used'][i-1] - ret[col]['used'][i]))
         #FIXME: the way we calculate CPU util leaves us with N-1 values to return to D3
         #Thus, we can cheat (if step is 1, we would be left with 0 values for util.
@@ -273,11 +274,16 @@ def get_mongostats(request):
         #ret[col]['used_diff'].append(ret[col]['used_diff'][-1])
 
         ret[col]['util'] = map(div, ret[col]['used_diff'], ret[col]['total_diff'])
+        util_values = len(ret[col]['util'])
+        if util_values < no_values_asked:
+            zero_prepend = [0] * (no_values_asked - util_values)
+            zero_prepend.extend(ret[col]['util'])
 
     timestamp = time() * 1000
     ret['timestamp'] = timestamp
     ret['interval'] = step
 
+    ret[col]['util'] = zero_prepend
     #log.info(ret)
     return ret
 
