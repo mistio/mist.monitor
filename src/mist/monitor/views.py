@@ -286,9 +286,9 @@ def get_mongo_load_stats(db, start, stop, step):
         calc_shortterm = interpolate.splev(new_x_axis, tck_short, der=0)
         calc_shortterm = numpy.abs(calc_shortterm)
         calc_midterm = interpolate.splev(new_x_axis, tck_mid, der=0)
-        calc_midterm = numpy.abs(calc_shortterm)
+        calc_midterm = numpy.abs(calc_midterm)
         calc_longterm = interpolate.splev(new_x_axis, tck_long, der=0)
-        calc_longterm = numpy.abs(calc_shortterm)
+        calc_longterm = numpy.abs(calc_longterm)
 
     ret['shortterm'] = list(calc_shortterm)
     ret['midterm'] = list(calc_midterm)
