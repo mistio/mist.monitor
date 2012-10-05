@@ -150,12 +150,15 @@ def mongo_get_load_stats(db, start, stop, step):
             sampling_step = nr_returned * float(step) / (stop - start)
             calc_stats = interpolate(calc_stats, nr_returned, sampling_step)
 
+        """Full return value
         stats = {
             'shortterm': list(calc_stats['shortterm']),
             'midterm': list(calc_stats['midterm']),
             'longterm': list(calc_stats['longterm'])
         }
-        return stats
+        """
+
+        return list(calc_stats['shortterm'])
 
 
 def mongo_get_memory_stats(db, start, stop, step):
