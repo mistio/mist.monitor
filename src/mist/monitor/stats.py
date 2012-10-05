@@ -199,13 +199,13 @@ def mongo_get_stats(uuid, expression, start, stop, step):
     db = connection[MONGODB['dbname']]
 
     stats = {}
-    for col in expression:
-        if col == 'cpu':
-            ret[col] = get_cpu_stats_mongo(db, uuid, start, stop, step)
-        if col == 'load':
-            ret[col] = get_load_stats_mongo(db, uuid, start, stop, step)
-        if col == 'memory':
-            ret[col] = get_memory_stats_mongo(db, uuid, start, stop, step)
+    for exp in expression:
+        if exp == 'cpu':
+            stats[exp] = mongo_get_cpu_stats(db, uuid, start, stop, step)
+        if exp == 'load':
+            stats[exp] = mongo_get_load_stats(db, uuid, start, stop, step)
+        if exp == 'memory':
+            stats[exp] = mongo_get_memory_stats(db, uuid, start, stop, step)
 
     return stats
 
