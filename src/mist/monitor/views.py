@@ -235,7 +235,7 @@ def get_mongocpustats_numpy(db, uuid, start, stop, step):
 
     if util.shape[0] < nr_values_asked:
         calc_util = numpy.zeros(nr_values_asked)
-        calc_util[-util.shape[0]::] = util 
+        calc_util[-util.shape[0]::] = util
     elif util.shape[0] > nr_values_asked:
         x_axis = numpy.arange(util.shape[0])
         tck = interpolate.splrep(x_axis, util)
@@ -244,6 +244,55 @@ def get_mongocpustats_numpy(db, uuid, start, stop, step):
         calc_util = numpy.abs(calc_util)
 
     ret['util'] = list(calc_util)
+
+    return ret
+
+
+def get_mongo_load_stats(db, start, stop, step):
+    res = {}
+    nr_values_asked = int((stop - start)/step)
+    ret = {'shortterm': [], 'midterm': [], 'longterm':[]}
+
+    query_dict = {'host': uuid,
+                  'time': {"$gte": datetime.fromtimestamp(int(start)),
+                           "$lt": datetime.fromtimestamp(int(stop)) }}
+
+    res = db.load.find(query_dict).sort('time', pymongo.DESCENDING)
+
+    for r in res:
+        ret['shortterm'].append(r['values'][0])
+        ret['midterm'].append(r['values'][1])
+        ret['longterm'].append(r['values'][2])
+
+    shortterm = numpy.array(ret['shortterm'])
+    midterm = numpy.array(ret['midterm'])
+    longterm = numpy.array(ret['longterm'])
+
+    nr_returned = shortterm.shape[0]
+
+    if nr_returned < nr_values_asked:
+        calc_shortterm = numpy.zeros(nr_values_asked)
+        calc_shortterm[-nr_returned::] = shortterm
+        calc_midterm = numpy.zeros(nr_values_asked)
+        calc_midterm[-nr_returned::] = midterm
+        calc_longterm = numpy.zeros(nr_values_asked)
+        calc_longterm[-nr_returned::] = longterm
+    elif nr_returned > nr_values_asked:
+        x_axis = numpy.arange(nr_returned)
+        tck_short = interpolate.splrep(x_axis, shortterm)
+        tck_mid = interpolate.splrep(x_axis, midterm)
+        tck_long = interpolate.splrep(x_axis, longterm)
+        new_x_axis = numpy.arange(0, nr_returned, nr_returned * float(step)/(stop-start))
+        calc_shortterm = interpolate.splev(new_x_axis, tck_short, der=0)
+        calc_shortterm = numpy.abs(calc_shortterm)
+        calc_midterm = interpolate.splev(new_x_axis, tck_mid, der=0)
+        calc_midterm = numpy.abs(calc_shortterm)
+        calc_longterm = interpolate.splev(new_x_axis, tck_long, der=0)
+        calc_longterm = numpy.abs(calc_shortterm)
+
+    ret['shortterm'] = list(calc_shortterm)
+    ret['midterm'] = list(calc_midterm)
+    ret['longterm'] = list(calc_longterm)
 
     return ret
 
@@ -357,7 +406,8 @@ def get_mongostats(request):
         #    ret[col] = get_mongocpustats(db, uuid, start, stop, step)
         if col == 'cpu':
             ret[col] = get_mongocpustats_numpy(db, uuid, start, stop, step)
-
+        if col == 'load':
+            ret[col] = get_mongo_load_stats(db, uuid, start, stop, step)
     #log.info(ret)
     return ret
 
