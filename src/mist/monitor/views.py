@@ -153,17 +153,21 @@ def get_stats(request):
                                     ['cpu', 'load', 'memory', 'disk'])
     if expression.__class__ in [str,unicode]:
         expression = [expression]
-    stop = int(request.params.get('stop', int(time())))
+
+    # step comes from te client in millisecs, convert it to secs
     step = int(request.params.get('step', 60000))
+    step = int(step/1000)
+
+    stop = int(request.params.get('stop', int(time())))
     start = int(request.params.get('start', stop - step))
 
     stats = {}
     if BACKEND == 'mongodb':
-        stats = mongo_get_stats(uuid, expression, stop, start, step)
+        stats = mongo_get_stats(uuid, expression, start, stop, step)
     elif BACKEND == 'graphite':
-        stats = graphite_get_stats(uuid, expression, stop, start, step)
+        stats = graphite_get_stats(uuid, expression, start, stop, step)
     elif BACKEND == 'dummy':
-        stats = dummy_get_stats(expression, stop, start, step)
+        stats = dummy_get_stats(expression, start, stop, step)
     else:
         log.error('Requested invalid monitoring backend: %s' % BACKEND)
         return Response('Service unavailable', 503)

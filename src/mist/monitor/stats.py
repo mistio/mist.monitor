@@ -191,55 +191,26 @@ def mongo_get_memory_stats(db, start, stop, step):
     return ret
 
 
-def mongo_get_stats(uuid, expression, stop, step, start):
-    """Get stats for this machine using the mongodb backend.
+def mongo_get_stats(uuid, expression, start, stop, step):
+    """Returns stats for the machine with the given uuid from the mongodb
+    backend.
     """
-    mongodb_hostname = MONGODB['host']
-    mongodb_port = MONGODB['port']
-    mongodb_name = MONGODB['dbname']
-    # get request params
-    try:
-        uuid = request.matchdict['machine']
+    connection = Connection(MONGODB['host'], MONGODB['port'])
+    db = connection[MONGODB['dbname']]
 
-        # check for errors
-        if not uuid:
-            log.error("cannot find uuid %s" % uuid)
-            raise
-    except Exception as e:
-        return Response('Bad Request', 400)
-
-    expression = request.params.get('expression', ['cpu', 'load', 'memory', 'disk'])
-    stop = int(request.params.get('stop', int(time())))
-    step = int(request.params.get('step', 60000))
-    start = int(request.params.get('start', stop - step))
-
-    if not expression:
-        expression = targets.keys()
-
-    connection = Connection(mongodb_hostname, mongodb_port)
-    db = connection[mongodb_name]
-    step = int(step/1000)
-    nr_values_asked = int((stop - start)/step)
-
-    ret = { }
-
-    if expression.__class__ in [str,unicode]:
-        expression = [expression]
-
+    stats = {}
     for col in expression:
-        #if col == 'cpu':
-        #    ret[col] = get_mongocpustats(db, uuid, start, stop, step)
         if col == 'cpu':
             ret[col] = get_cpu_stats_mongo(db, uuid, start, stop, step)
         if col == 'load':
             ret[col] = get_load_stats_mongo(db, uuid, start, stop, step)
         if col == 'memory':
             ret[col] = get_memory_stats_mongo(db, uuid, start, stop, step)
-    #log.info(ret)
-    return ret
+
+    return stats
 
 
-def graphite_get_stats(uuid, expression, stop, step, start):
+def graphite_get_stats(uuid, expression, start, stop, step):
     """Returns stats from graphite.
 
     .. warning:: I doesn't work, needs rewrite to fit the client API
@@ -317,7 +288,7 @@ def graphite_get_stats(uuid, expression, stop, step, start):
     return {}
 
 
-def dummy_get_stats(expression, stop, step, start):
+def dummy_get_stats(expression, start, stop, step):
     """Returns simulated stats.
 
     .. warning:: I doesn't work, needs rewrite to fit the client API
