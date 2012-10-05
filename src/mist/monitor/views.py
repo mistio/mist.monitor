@@ -297,6 +297,71 @@ def get_mongo_load_stats(db, start, stop, step):
     return ret
 
 
+def get_mongo_memory_stats(db, start, stop, step):
+    res = {}
+    nr_values_asked = int((stop - start)/step)
+    ret = {'free': [], 'used': [], 'cached': [], 'buffered': [], 'total': []}
+
+    query_dict = {'host': uuid,
+                  'time': {"$gte": datetime.fromtimestamp(int(start)),
+                           "$lt": datetime.fromtimestamp(int(stop)) }}
+
+    res = db.memory.find(query_dict).sort('time', pymongo.DESCENDING)
+
+    for r in res:
+        index = r['type_instance']
+        value = r['values']
+        if not ret.get(index, None):
+            ret[index] = value
+        else:
+            ret[index].extend(value)
+
+    free = numpy.array(ret['free'])
+    used = numpy.array(ret['used'])
+    cached = numpy.array(ret['cached'])
+    buffered = numpy.array(ret['buffered'])
+    total = free + used
+
+    nr_returned = free.shape[0]
+
+    if nr_returned < nr_values_asked:
+        calc_free = numpy.zeros(nr_values_asked)
+        calc_free[-nr_returned::] = free
+        calc_used = numpy.zeros(nr_values_asked)
+        calc_used[-nr_returned::] = used
+        calc_cached = numpy.zeros(nr_values_asked)
+        calc_cached[-nr_returned::] = cached
+        calc_buffered = numpy.zeros(nr_values_asked)
+        calc_buffered[-nr_returned::] = buffered
+        calc_total = numpy.zeros(nr_values_asked)
+        calc_total[-nr_returned::] = total
+    elif nr_returned > nr_values_asked:
+        x_axis = numpy.arange(nr_returned)
+        tck_free = interpolate.splrep(x_axis, free)
+        tck_used = interpolate.splrep(x_axis, used)
+        tck_cached = interpolate.splrep(x_axis, cached)
+        tck_buffered = interpolate.splrep(x_axis, buffered)
+        new_x_axis = numpy.arange(0, nr_returned, nr_returned * float(step)/(stop-start))
+        calc_free = interpolate.splev(new_x_axis, tck_free, der=0)
+        calc_free = numpy.abs(calc_free)
+        calc_used = interpolate.splev(new_x_axis, tck_used, der=0)
+        calc_used = numpy.abs(calc_used)
+        calc_cached = interpolate.splev(new_x_axis, tck_cached, der=0)
+        calc_cached = numpy.abs(calc_cached)
+        calc_buffered = interpolate.splev(new_x_axis, tck_buffered, der=0)
+        calc_buffered = numpy.abs(calc_buffered)
+        # do not interpolate this to get real values
+        calc_total = total[0::(nr_returned * float(step)/(stop-start))]
+
+    ret['free'] = list(calc_free)
+    ret['used'] = list(calc_used)
+    ret['cached'] = list(calc_cached)
+    ret['buffered'] = list(calc_buffered)
+    ret['total'] = list(calc_total)
+
+    return ret
+
+
 def get_mongocpustats(db, uuid, start, stop, step):
 
     res = {}
@@ -407,6 +472,8 @@ def get_mongostats(request):
         if col == 'cpu':
             ret[col] = get_mongocpustats_numpy(db, uuid, start, stop, step)
         if col == 'load':
+            ret[col] = get_mongo_load_stats(db, uuid, start, stop, step)
+        if col == 'memory':
             ret[col] = get_mongo_load_stats(db, uuid, start, stop, step)
     #log.info(ret)
     return ret
