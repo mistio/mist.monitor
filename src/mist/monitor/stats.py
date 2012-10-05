@@ -5,7 +5,7 @@ from time import time
 #import math                # used in dummy
 #from random import gauss   # used in dummy
 import numpy
-from scipy import interpolate
+from scipy import interpolate as scinterp
 
 from logging import getLogger
 
@@ -15,6 +15,33 @@ from mist.monitor.config import MONGODB
 
 
 log = getLogger('mist.monitor')
+
+
+def pad_zeros(stats, old_size, new_size):
+    """Pads zeros to create a new array from stats with size == new_size."""
+    for stat in stats:
+        padded = numpy.zeros(new_size)
+        padded[-old_size::] = stats[stat]
+        stats[stat] = padded
+
+    return stats
+
+
+def interpolate(stats, old_size, sampling_step):
+    """Returns interpolated stats, using spline interpolation
+
+    .. note:: This also applies abs() to the returned values
+    """
+    x_axis = numpy.arange(old_size)
+    new_x_axis = numpy.arange(0, old_size, sampling_step)
+
+    for stat in stats:
+        fitted = scinterp.splrep(x_axis, stats[stat])
+        stats[stat] = scinterp.splev(new_x_axis, fitted, der=0)
+        # FIXME: is this useful for every case?
+        stats[stat] = numpy.abs(stats[stat])
+
+    return stats
 
 
 def mongo_get_cpu_stats(db, uuid, start, stop, step):
@@ -68,9 +95,9 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         calc_util[-util.shape[0]::] = util
     elif util.shape[0] > nr_values_asked:
         x_axis = numpy.arange(util.shape[0])
-        tck = interpolate.splrep(x_axis, util)
+        tck = scinterp.splrep(x_axis, util)
         new_x_axis = numpy.arange(0, util.shape[0], util.shape[0] * float(step)/(stop-start))
-        calc_util = interpolate.splev(new_x_axis, tck, der=0)
+        calc_util = scinterp.splev(new_x_axis, tck, der=0)
         calc_util = numpy.abs(calc_util)
 
     ret['util'] = list(calc_util)
@@ -79,51 +106,56 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
 
 
 def mongo_get_load_stats(db, start, stop, step):
-    nr_values_asked = int((stop - start)/step)
-    ret = {'shortterm': [], 'midterm': [], 'longterm':[]}
+    """Returns load data from mongo.
 
-    query_dict = {'host': uuid,
-                  'time': {"$gte": datetime.fromtimestamp(int(start)),
-                           "$lt": datetime.fromtimestamp(int(stop)) }}
+    .. note:: Although it collects all, it returns only the short term load,
+              for smaller response size.
+    """
+    query_dict = {
+        'host': uuid,
+        'time': {
+            '$gte': datetime.fromtimestamp(int(start)),
+            '$lt': datetime.fromtimestamp(int(stop))
+        }
+    }
+    docs = db.load.find(query_dict).sort('time', DESCENDING)
 
-    res = db.load.find(query_dict).sort('time', DESCENDING)
+    stats = {
+        'shortterm': [],
+        'midterm': [],
+        'longterm':[]
+    }
 
-    for r in res:
-        ret['shortterm'].append(r['values'][0])
-        ret['midterm'].append(r['values'][1])
-        ret['longterm'].append(r['values'][2])
+    for doc in docs:
+        stats['shortterm'].append(doc['values'][0])
+        stats['midterm'].append(doc['values'][1])
+        stats['longterm'].append(doc['values'][2])
 
-    shortterm = numpy.array(ret['shortterm'])
-    midterm = numpy.array(ret['midterm'])
-    longterm = numpy.array(ret['longterm'])
+    nr_asked = int((stop - start)/step)
+    nr_returned = docs.count()
 
-    nr_returned = shortterm.shape[0]
+    if nr_asked == nr_returned:
+        return stats
+    else:
+        calc_stats = {
+            'shortterm': numpy.array(stats['shortterm']),
+            'midterm': numpy.array(ret['midterm']),
+            'longterm': numpy.array(ret['longterm'])
+        }
 
-    if nr_returned < nr_values_asked:
-        calc_shortterm = numpy.zeros(nr_values_asked)
-        calc_shortterm[-nr_returned::] = shortterm
-        calc_midterm = numpy.zeros(nr_values_asked)
-        calc_midterm[-nr_returned::] = midterm
-        calc_longterm = numpy.zeros(nr_values_asked)
-        calc_longterm[-nr_returned::] = longterm
-    elif nr_returned > nr_values_asked:
-        x_axis = numpy.arange(nr_returned)
-        tck_short = interpolate.splrep(x_axis, shortterm)
-        tck_mid = interpolate.splrep(x_axis, midterm)
-        tck_long = interpolate.splrep(x_axis, longterm)
-        new_x_axis = numpy.arange(0, nr_returned, nr_returned * float(step)/(stop-start))
-        calc_shortterm = interpolate.splev(new_x_axis, tck_short, der=0)
-        calc_shortterm = numpy.abs(calc_shortterm)
-        calc_midterm = interpolate.splev(new_x_axis, tck_mid, der=0)
-        calc_midterm = numpy.abs(calc_midterm)
-        calc_longterm = interpolate.splev(new_x_axis, tck_long, der=0)
-        calc_longterm = numpy.abs(calc_longterm)
+        if nr_returned < nr_values_asked:
+            calc_stats = pad_zeros(calc_stats, nr_returned, nr_asked)
+        else:
+            # when nr_returned > nr_values_asked:
+            sampling_step = nr_returned * float(step) / (stop - start)
+            calc_stats = interpolate(calc_stats, nr_returned, sampling_step)
 
-    ret['shortterm'] = list(calc_shortterm)
-    ret['midterm'] = list(calc_midterm)
-    ret['longterm'] = list(calc_longterm)
-
-    return ret
+        stats = {
+            'shortterm': list(calc_stats['shortterm']),
+            'midterm': list(calc_stats['midterm']),
+            'longterm': list(calc_stats['longterm'])
+        }
+        return stats
 
 
 def mongo_get_memory_stats(db, start, stop, step):
@@ -166,18 +198,18 @@ def mongo_get_memory_stats(db, start, stop, step):
         calc_total[-nr_returned::] = total
     elif nr_returned > nr_values_asked:
         x_axis = numpy.arange(nr_returned)
-        tck_free = interpolate.splrep(x_axis, free)
-        tck_used = interpolate.splrep(x_axis, used)
-        tck_cached = interpolate.splrep(x_axis, cached)
-        tck_buffered = interpolate.splrep(x_axis, buffered)
+        tck_free = scinterp.splrep(x_axis, free)
+        tck_used = scinterp.splrep(x_axis, used)
+        tck_cached = scinterp.splrep(x_axis, cached)
+        tck_buffered = scinterp.splrep(x_axis, buffered)
         new_x_axis = numpy.arange(0, nr_returned, nr_returned * float(step)/(stop-start))
-        calc_free = interpolate.splev(new_x_axis, tck_free, der=0)
+        calc_free = scinterp.splev(new_x_axis, tck_free, der=0)
         calc_free = numpy.abs(calc_free)
-        calc_used = interpolate.splev(new_x_axis, tck_used, der=0)
+        calc_used = scinterp.splev(new_x_axis, tck_used, der=0)
         calc_used = numpy.abs(calc_used)
-        calc_cached = interpolate.splev(new_x_axis, tck_cached, der=0)
+        calc_cached = scinterp.splev(new_x_axis, tck_cached, der=0)
         calc_cached = numpy.abs(calc_cached)
-        calc_buffered = interpolate.splev(new_x_axis, tck_buffered, der=0)
+        calc_buffered = scinterp.splev(new_x_axis, tck_buffered, der=0)
         calc_buffered = numpy.abs(calc_buffered)
         # do not interpolate this to get real values
         calc_total = total[0::(nr_returned * float(step)/(stop-start))]
