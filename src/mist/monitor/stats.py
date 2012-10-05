@@ -106,7 +106,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
 
 
 def mongo_get_load_stats(db, start, stop, step):
-    """Returns load data from mongo.
+    """Returns machine's load stats from mongo.
 
     .. note:: Although it collects all, it returns only the short term load,
               for smaller response size.
@@ -135,95 +135,105 @@ def mongo_get_load_stats(db, start, stop, step):
     nr_returned = docs.count()
 
     if nr_asked == nr_returned:
-        return stats
+        # All values
+        # ----------
+        # return stats
+
+        # Most important values
+        # ---------------------
+        return stats['shortterm']
     else:
         calc_stats = {
             'shortterm': numpy.array(stats['shortterm']),
             'midterm': numpy.array(ret['midterm']),
             'longterm': numpy.array(ret['longterm'])
         }
-
-        if nr_returned < nr_values_asked:
+        if nr_returned < nr_asked:
             calc_stats = pad_zeros(calc_stats, nr_returned, nr_asked)
         else:
-            # when nr_returned > nr_values_asked:
+            # When nr_returned > nr_asked:
             sampling_step = nr_returned * float(step) / (stop - start)
             calc_stats = interpolate(calc_stats, nr_returned, sampling_step)
 
-        """Full return value
-        stats = {
-            'shortterm': list(calc_stats['shortterm']),
-            'midterm': list(calc_stats['midterm']),
-            'longterm': list(calc_stats['longterm'])
-        }
-        """
+        # All values
+        # ----------
+        # stats = {
+        #     'shortterm': list(calc_stats['shortterm']),
+        #     'midterm': list(calc_stats['midterm']),
+        #     'longterm': list(calc_stats['longterm'])
+        # }
 
+        # Most important values
+        # ---------------------
         return list(calc_stats['shortterm'])
 
 
 def mongo_get_memory_stats(db, start, stop, step):
-    res = {}
-    nr_values_asked = int((stop - start)/step)
-    ret = {'free': [], 'used': [], 'cached': [], 'buffered': [], 'total': []}
+    """Returns machine's memory stats from mongo.
 
-    query_dict = {'host': uuid,
-                  'time': {"$gte": datetime.fromtimestamp(int(start)),
-                           "$lt": datetime.fromtimestamp(int(stop)) }}
+    .. note:: Although it collects all, it returns only a list of memory used
+              and a single number for total memory, for smaller response size.
+    """
+    query_dict = {
+        'host': uuid,
+        'time': {
+            '$gte': datetime.fromtimestamp(int(start)),
+            '$lt': datetime.fromtimestamp(int(stop))
+        }
+    }
+    docs = db.memory.find(query_dict).sort('time', DESCENDING)
 
-    res = db.memory.find(query_dict).sort('time', DESCENDING)
+    stats = {
+        'free': [],
+        'used': [],
+        'cached':[],
+        'buffered': [],
+        'total': 0
+    }
 
-    for r in res:
-        index = r['type_instance']
-        value = r['values']
-        if not ret.get(index, None):
-            ret[index] = value
+    for doc in docs:
+        stats[doc['type_instance']].append(doc['values'])
+
+    nr_asked = int((stop - start)/step)
+    nr_returned = docs.count()
+
+    stats['total'] = stats['free'][0] + stats['used'][0]
+
+    if nr_asked == nr_returned:
+        # All values
+        # ----------
+        # return stats
+
+        # Most important values
+        # ---------------------
+        return {'used': stats['used'], 'total': stats['total']}
+    else:
+        calc_stats = {
+            'free': numpy.array(stats['free']),
+            'used': numpy.array(ret['used']),
+            'cached': numpy.array(ret['cached']),
+            'buffered': numpy.array(ret['buffered'])
+        }
+        if nr_returned < nr_asked:
+            calc_stats = pad_zeros(calc_stats, nr_returned, nr_asked)
         else:
-            ret[index].extend(value)
+            # When nr_returned > nr_asked:
+            sampling_step = nr_returned * float(step) / (stop - start)
+            calc_stats = interpolate(calc_stats, nr_returned, sampling_step)
 
-    free = numpy.array(ret['free'])
-    used = numpy.array(ret['used'])
-    cached = numpy.array(ret['cached'])
-    buffered = numpy.array(ret['buffered'])
-    total = free + used
+        # All values
+        # ----------
+        # stats = {
+        #     'free': list(calc_stats['free']),
+        #     'used': list(calc_stats['used']),
+        #     'cached': list(calc_stats['cached'])
+        #     'buffered': list(calc_stats['buffered'])
+        #     'total': stats['total'])
+        # }
 
-    nr_returned = free.shape[0]
-
-    if nr_returned < nr_values_asked:
-        calc_free = numpy.zeros(nr_values_asked)
-        calc_free[-nr_returned::] = free
-        calc_used = numpy.zeros(nr_values_asked)
-        calc_used[-nr_returned::] = used
-        calc_cached = numpy.zeros(nr_values_asked)
-        calc_cached[-nr_returned::] = cached
-        calc_buffered = numpy.zeros(nr_values_asked)
-        calc_buffered[-nr_returned::] = buffered
-        calc_total = numpy.zeros(nr_values_asked)
-        calc_total[-nr_returned::] = total
-    elif nr_returned > nr_values_asked:
-        x_axis = numpy.arange(nr_returned)
-        tck_free = scinterp.splrep(x_axis, free)
-        tck_used = scinterp.splrep(x_axis, used)
-        tck_cached = scinterp.splrep(x_axis, cached)
-        tck_buffered = scinterp.splrep(x_axis, buffered)
-        new_x_axis = numpy.arange(0, nr_returned, nr_returned * float(step)/(stop-start))
-        calc_free = scinterp.splev(new_x_axis, tck_free, der=0)
-        calc_free = numpy.abs(calc_free)
-        calc_used = scinterp.splev(new_x_axis, tck_used, der=0)
-        calc_used = numpy.abs(calc_used)
-        calc_cached = scinterp.splev(new_x_axis, tck_cached, der=0)
-        calc_cached = numpy.abs(calc_cached)
-        calc_buffered = scinterp.splev(new_x_axis, tck_buffered, der=0)
-        calc_buffered = numpy.abs(calc_buffered)
-        # do not interpolate this to get real values
-        calc_total = total[0::(nr_returned * float(step)/(stop-start))]
-
-    ret['free'] = list(calc_free)
-    ret['used'] = list(calc_used)
-    ret['cached'] = list(calc_cached)
-    ret['buffered'] = list(calc_buffered)
-    ret['total'] = list(calc_total)
-
-    return ret
+        # Most important values
+        # ---------------------
+        return {'used': list(calc_stats['used']), 'total': stats['total']}
 
 
 def mongo_get_stats(uuid, expression, start, stop, step):
