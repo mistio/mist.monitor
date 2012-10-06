@@ -248,6 +248,15 @@ def mongo_get_memory_stats(db, uuid, start, stop, step):
         # ---------------------
         return {'used': list(calc_stats['used']), 'total': stats['total']}
 
+
+def calculate_network_speed(previous, current):
+
+    bytes_diff = (current['value'] - previous['value'])
+    timestamp_diff = (current['timestamp'] - previous['timestamp'])
+
+    return float(bytes_diff) / timestamp_diff
+
+
 def mongo_get_network_stats(db, uuid, start, stop, step):
 
     res = {}
@@ -271,11 +280,15 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
     for iface in set_of_ifaces:
         ret[iface] = {}
         ret[iface]['total'] = []
+        ret['timestamp'] = []
+        ret[iface]['speed'] = {'rx': [], 'tx': [] }
 
         for index in set_of_data:
             ret[iface][index] = {}
             for field in set_of_fields:
                ret[iface][index][field] = []
+    current = { 'value': [], 'timestamp': 0}
+    previous = { 'value': [], 'timestamp': 0}
 
     prev = None
     for r in res:
@@ -283,20 +296,28 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
         iface = r['type_instance']
         value = r['values']
         index = r['type']
-        if not ret.get(index, None):
-            for field in set_of_fields:
-                ret[iface][index][field].append(value[set_of_fields.index(field)])
-                #print value[set_of_fields.index(field)]
-                #print ret[iface][field]
-        #else:
-        #        ret[iface][field].extend(value[set_of_fields.index(field)])
+
         if prev != curr:
             ret[iface]['total'].append(0)
+            ret['timestamp'].append(curr.strftime("%s"))
 
-        #if iface != 'lo':
-        #    ret[iface]['rx'].append(float(value[0]))
-        #    ret[iface]['tx'].append(float(value[1]))
-        #ret[iface]['total'][-1] += value[0] + value[1]
+        if not ret.get(index, None):
+            for field in set_of_fields:
+                #get values for ['rx'] and ['tx'], use .index(field) to get
+                #the idx of the relevant field
+                list_ptr = ret[iface][index][field]
+                idx = set_of_fields.index(field)
+                list_ptr.append(value[idx])
+                nr_stored = len(list_ptr)
+                #ugly check to make sure we have 2 or more values to calculate
+                #the diff
+                if nr_stored > 1 and index == 'if_octets':
+                    current['value'] = list_ptr[-1]
+                    previous['value'] = list_ptr[-2]
+                    current['timestamp'] = int(ret['timestamp'][-1])
+                    previous['timestamp'] = int(ret['timestamp'][-2])
+                    speed = calculate_network_speed(current, previous)
+                    ret[iface]['speed'][field].append(speed)
         prev = curr
 
     return ret
