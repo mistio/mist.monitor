@@ -1,3 +1,15 @@
+"""Module for getting stats from different monitoring backends.
+
+It currently supports mongodb and there is some previous work on graphite and
+dummy, which don't work right now.
+
+From collectd we need stats for cpu, load, memory, network and disks.
+
+Collectd returns these values in the following format:
+
+We return only a subset of these values to save json size. The format we
+return is the following:
+"""
 #import requests            # used in grapite
 from datetime import datetime
 from time import time
