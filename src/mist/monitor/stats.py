@@ -24,7 +24,6 @@ from logging import getLogger
 from pymongo import Connection
 from pymongo import DESCENDING
 from mist.monitor.config import MONGODB
-import pymongo
 
 
 log = getLogger('mist.monitor')
@@ -267,7 +266,7 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
                            "$lt": datetime.fromtimestamp(int(stop)) }}
 
     #XXX: No need to use limit, we just return all values in the requested time range
-    res = db.interface.find(query_dict).sort('time', pymongo.DESCENDING)
+    res = db.interface.find(query_dict).sort('time', DESCENDING)
     #.limit(2*8*(int((stop-start)/step)))
 
     ret = { }
