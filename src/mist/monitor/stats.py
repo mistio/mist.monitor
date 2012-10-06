@@ -150,8 +150,7 @@ def mongo_get_load_stats(db, uuid, start, stop, step):
             'longterm': numpy.array(stats['longterm'])
         }
         if nr_returned < nr_asked:
-            calc_stats_new = pad_zeros(calc_stats, nr_returned, nr_asked)
-            calc_stats = calc_stats_new
+            calc_stats = pad_zeros(calc_stats, nr_returned, nr_asked)
         else:
             # When nr_returned > nr_asked:
             sampling_step = nr_returned * float(step) / (stop - start)
@@ -217,8 +216,7 @@ def mongo_get_memory_stats(db, uuid, start, stop, step):
             'buffered': numpy.array(stats['buffered'])
         }
         if nr_returned < nr_asked:
-            calc_stats_new = pad_zeros(calc_stats, nr_returned, nr_asked)
-            calc_stats= calc_stats_new
+            calc_stats = pad_zeros(calc_stats, nr_returned, nr_asked)
         else:
             # When nr_returned > nr_asked:
             sampling_step = nr_returned * float(step) / (stop - start)
