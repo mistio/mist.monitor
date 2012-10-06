@@ -12,6 +12,7 @@ from logging import getLogger
 from pymongo import Connection
 from pymongo import DESCENDING
 from mist.monitor.config import MONGODB
+import pymongo
 
 
 log = getLogger('mist.monitor')
@@ -105,7 +106,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
     return ret
 
 
-def mongo_get_load_stats(db, start, stop, step):
+def mongo_get_load_stats(db, uuid, start, stop, step):
     """Returns machine's load stats from mongo.
 
     .. note:: Although it collects all, it returns only the short term load,
@@ -132,7 +133,7 @@ def mongo_get_load_stats(db, start, stop, step):
         stats['longterm'].append(doc['values'][2])
 
     nr_asked = int((stop - start)/step)
-    nr_returned = docs.count()
+    nr_returned =len(stats['shortterm'])
 
     if nr_asked == nr_returned:
         # All values
@@ -145,11 +146,12 @@ def mongo_get_load_stats(db, start, stop, step):
     else:
         calc_stats = {
             'shortterm': numpy.array(stats['shortterm']),
-            'midterm': numpy.array(ret['midterm']),
-            'longterm': numpy.array(ret['longterm'])
+            'midterm': numpy.array(stats['midterm']),
+            'longterm': numpy.array(stats['longterm'])
         }
         if nr_returned < nr_asked:
-            calc_stats = pad_zeros(calc_stats, nr_returned, nr_asked)
+            calc_stats_new = pad_zeros(calc_stats, nr_returned, nr_asked)
+            calc_stats = calc_stats_new
         else:
             # When nr_returned > nr_asked:
             sampling_step = nr_returned * float(step) / (stop - start)
@@ -168,7 +170,7 @@ def mongo_get_load_stats(db, start, stop, step):
         return list(calc_stats['shortterm'])
 
 
-def mongo_get_memory_stats(db, start, stop, step):
+def mongo_get_memory_stats(db, uuid, start, stop, step):
     """Returns machine's memory stats from mongo.
 
     .. note:: Although it collects all, it returns only a list of memory used
@@ -192,10 +194,10 @@ def mongo_get_memory_stats(db, start, stop, step):
     }
 
     for doc in docs:
-        stats[doc['type_instance']].append(doc['values'])
+        stats[doc['type_instance']].append(doc['values'][0])
 
     nr_asked = int((stop - start)/step)
-    nr_returned = docs.count()
+    nr_returned =len(stats['free'])
 
     stats['total'] = stats['free'][0] + stats['used'][0]
 
@@ -210,12 +212,13 @@ def mongo_get_memory_stats(db, start, stop, step):
     else:
         calc_stats = {
             'free': numpy.array(stats['free']),
-            'used': numpy.array(ret['used']),
-            'cached': numpy.array(ret['cached']),
-            'buffered': numpy.array(ret['buffered'])
+            'used': numpy.array(stats['used']),
+            'cached': numpy.array(stats['cached']),
+            'buffered': numpy.array(stats['buffered'])
         }
         if nr_returned < nr_asked:
-            calc_stats = pad_zeros(calc_stats, nr_returned, nr_asked)
+            calc_stats_new = pad_zeros(calc_stats, nr_returned, nr_asked)
+            calc_stats= calc_stats_new
         else:
             # When nr_returned > nr_asked:
             sampling_step = nr_returned * float(step) / (stop - start)
@@ -235,6 +238,59 @@ def mongo_get_memory_stats(db, start, stop, step):
         # ---------------------
         return {'used': list(calc_stats['used']), 'total': stats['total']}
 
+def mongo_get_network_stats(db, uuid, start, stop, step):
+
+    res = {}
+    nr_values_asked = int((stop - start)/step)
+
+    query_dict = {'host': uuid,
+                  'time': {"$gte": datetime.fromtimestamp(int(start)),
+                           "$lt": datetime.fromtimestamp(int(stop)) }}
+
+    #XXX: No need to use limit, we just return all values in the requested time range
+    res = db.interface.find(query_dict).sort('time', pymongo.DESCENDING)
+    #.limit(2*8*(int((stop-start)/step)))
+
+    ret = { }
+    set_of_ifaces = db.interface.distinct('type_instance') #db.interface.distinct('type_instance', {'host':uuid})
+    set_of_fields = db.interface.distinct('dsnames')
+    set_of_data = db.interface.distinct('type')
+    if "" in set_of_ifaces:
+        set_of_ifaces.remove("")
+
+    for iface in set_of_ifaces:
+        ret[iface] = {}
+        ret[iface]['total'] = []
+
+        for index in set_of_data:
+            ret[iface][index] = {}
+            for field in set_of_fields:
+               ret[iface][index][field] = []
+
+    prev = None
+    for r in res:
+        curr = r['time']
+        iface = r['type_instance']
+        value = r['values']
+        index = r['type']
+        if not ret.get(index, None):
+            for field in set_of_fields:
+                ret[iface][index][field].append(value[set_of_fields.index(field)])
+                #print value[set_of_fields.index(field)]
+                #print ret[iface][field]
+        #else:
+        #        ret[iface][field].extend(value[set_of_fields.index(field)])
+        if prev != curr:
+            ret[iface]['total'].append(0)
+
+        #if iface != 'lo':
+        #    ret[iface]['rx'].append(float(value[0]))
+        #    ret[iface]['tx'].append(float(value[1]))
+        #ret[iface]['total'][-1] += value[0] + value[1]
+        prev = curr
+
+    return ret
+
 
 def mongo_get_stats(uuid, expression, start, stop, step):
     """Returns stats for the machine with the given uuid from the mongodb
@@ -245,12 +301,15 @@ def mongo_get_stats(uuid, expression, start, stop, step):
 
     stats = {}
     for exp in expression:
+        #print exp
         if exp == 'cpu':
             stats[exp] = mongo_get_cpu_stats(db, uuid, start, stop, step)
         if exp == 'load':
             stats[exp] = mongo_get_load_stats(db, uuid, start, stop, step)
         if exp == 'memory':
             stats[exp] = mongo_get_memory_stats(db, uuid, start, stop, step)
+        if exp == 'network':
+            stats[exp] = mongo_get_network_stats(db, uuid, start, stop, step)
 
     return stats
 

@@ -150,7 +150,7 @@ def get_stats(request):
         return Response('Bad Request', 400)
 
     expression = request.params.get('expression',
-                                    ['cpu', 'load', 'memory', 'disk'])
+                                    ['cpu', 'load', 'memory', 'disk', 'network'])
     if expression.__class__ in [str,unicode]:
         expression = [expression]
 
