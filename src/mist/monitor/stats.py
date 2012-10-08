@@ -389,10 +389,10 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
     # Prepare return, only if_octets for now
     nr_asked = int((stop - start) / step)
 
-    speed = list(speed['eth0']['if_octets'])
-    speed = resize_stats(speed, nr_asked)
+    rx_speed = resize_stats(speed['eth0']['if_octets']['rx'], nr_asked)
+    tx_speed = resize_stats(speed['eth0']['if_octets']['tx'], nr_asked)
 
-    return {'eth0': speed}
+    return {'eth0': {'rx': rx_speed, 'tx': tx_speed}}
 
     """
     res = {}
