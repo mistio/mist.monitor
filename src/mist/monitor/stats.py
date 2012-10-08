@@ -242,10 +242,9 @@ def mongo_get_load_stats(db, uuid, start, stop, step):
 
     # Prepare return, only shortterm for now
     nr_asked = int((stop - start) / step)
-    shortterm = numpy.array(stats['shortterm'])
-    shortterm = resize_stats(shortterm, nr_asked)
+    shortterm = resize_stats(numpy.array(stats['shortterm']), nr_asked)
 
-    return [shortterm]
+    return shortterm
 
 
 def mongo_get_memory_stats(db, uuid, start, stop, step):
@@ -277,8 +276,7 @@ def mongo_get_memory_stats(db, uuid, start, stop, step):
     total_memory = stats['free'][0] + stats['used'][0]
 
     nr_asked = int((stop - start) / sstep)
-    used = numpy.array(stats['used'])
-    used = resize_stats(used, nr_asked)
+    used = resize_stats(numpy.array(stats['used']), nr_asked)
 
     return {'used': used, 'total': total_memory}
 
