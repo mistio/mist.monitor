@@ -136,7 +136,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         total_prev[0] = 0.0
         idles_prev = numpy.roll(idles, 1)
         idles_prev[0] = 0.0
-        utilization[core] = ((totals - idles) - (totals_prev - idles_prev)) /
+        utilization[core] = ((totals - idles) - (totals_prev - idles_prev)) /\
                             (totals - totals_prev)
         utilization[core] = numpy.abs(utilization[core])
 
@@ -373,13 +373,13 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
             rx = numpy.array(stats[iface][stat_type]['rx'])
             rx_prev = numpy.roll(rx, 1)
             rx_prev[0] = 0.0
-            speed[iface][stat_type]['rx'] = (rx - rx_prev) /
+            speed[iface][stat_type]['rx'] = (rx - rx_prev) /\
                                             (timestamps - timestamps_prev)
 
             tx = numpy.array(stats[iface][stat_type]['tx'])
             tx_prev = numpy.roll(tx, 1)
             tx_prev[0] = 0.0
-            speed[iface][stat_type]['tx'] = tx - tx_prev) /
+            speed[iface][stat_type]['tx'] = tx - tx_prev) /\
                                             (timestamps - timestamps_prev)
 
     # Prepare return, only if_octets for now
