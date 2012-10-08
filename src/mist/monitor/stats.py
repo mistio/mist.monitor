@@ -124,12 +124,12 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         # Arrange stats in a 2D array where each line is a stat type and each
         # column a timestamp. Every row should have the same length. The first
         # row will be full of zeros, just to enable vstacking.
-        2d_stats = numpy.zeros(len(stats[core]['user']))
+        arr_stats = numpy.zeros(len(stats[core]['user']))
         for stat_type in stats[core]:
             row = numpy.array(stats[core][stat_type])
-            2d_stats = numpy.vstack(2d_stats, row)
+            arr_stats = numpy.vstack(arr_stats, row)
         # sum along every column
-        totals = 2d_stats.sum(0)
+        totals = arr_stats.sum(0)
         idles = numpy.array(stats[core]['idle'])
         # roll to create total_t-1, replace values that don't exist with zero
         totals_prev = numpy.roll(totals, 1)
