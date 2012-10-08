@@ -115,8 +115,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         if not stats.get(core, None):
             stats[core] = {}
         if not stats[core].get(stat_type, None):
-            stats[core][stat_type] = []
-            stats[core][stat_type].append(stat_value)
+            stats[core][stat_type] = [stat_value]
         else:
             stats[core][stat_type].append(stat_value)
 
@@ -128,7 +127,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         # Arrange stats in a 2D array where each line is a stat type and each
         # column a timestamp. Every row should have the same length. The first
         # row will be full of zeros, just to enable vstacking.
-        2d_stats = numpy.zeros(len(status[core]['user']))
+        2d_stats = numpy.zeros(len(stats[core]['user']))
         for stat_type in stats[core]:
             row = numpy.array(stats[core][stat_type])
             2d_stats = numpy.vstack(2d_stats, row)
@@ -144,7 +143,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
                             (totals - totals_prev)
         utilization[core] = numpy.abs(utilization[core])
 
-    # sum utilization across all cores
+    # Prepare return, sum utilization across all cores
     sum_utilization = numpy.zeros(utilization['0'].shape[0])
     for core in stats:
         sum_utilization += utilization[core]
@@ -301,15 +300,33 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
 
         stats = {
             'lo': {
-                'rx': [...],
-                'tx': [...],
-                'timestamp': [...]
+                if_octets: {
+                    'rx': [...],
+                    'tx': [...]
+                },
+                if_packets: {
+                    'rx': [...],
+                    'tx': [...]
+                }
+                if_errors: {
+                    'rx': [...],
+                    'tx': [...]
+                }
             },
 
             'eth0': {
-                'rx': [...],
-                'tx': [...],
-                'timestamp': [...]
+                if_octets: {
+                    'rx': [...],
+                    'tx': [...]
+                },
+                if_packets: {
+                    'rx': [...],
+                    'tx': [...]
+                }
+                if_errors: {
+                    'rx': [...],
+                    'tx': [...]
+                }
             },
 
             ....,
@@ -319,11 +336,12 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
             }
         }
 
-    The basic keys are the available network interfaces.
+    The basic keys are the available network interfaces. To calcutate speed
+    the if_octets values are used and timestamps are saved in a different
+    list.
 
-    .. note:: Although it collects all, it returns only the summed speed of
-              all available interfaces (e.g. eth0, eth1 etc.), for smaller
-              response size.
+    .. note:: Although it collects all, it returns only the eth0 speed, which
+              is usually public, for smaller response size.
     """
     query_dict = {
         'host': uuid,
@@ -334,6 +352,49 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
     }
     docs = db.interface.find(query_dict).sort('time', DESCENDING)
 
+    timestamps = []
+    for doc in docs:
+        iface = doc['type_instance']
+        stat_type = doc['type']
+        if not stats.get(iface, None):
+            stats[iface] = {}
+        iface_type
+        if not stats[iface].get(stat_type, None):
+            stats[iface][stat_type] = {
+                'rx': [float(doc['values'][0])],
+                'tx': [float(doc['values'][1])]
+            }
+            timestamps.append(doc['time'].strftime("%s"))
+        else:
+            stats[iface][stat_type]['rx'].append(float(doc['values'][0]))
+            stats[iface][stat_type]['tx'].append(float(doc['values'][1]))
+            timestamps.append(doc['time'].strftime("%s"))
+
+    speed = {}
+    timestamps = numpy.array(timestamps)
+    timestamps_prev = numpy.roll(timestamps, 1)
+    timestamps_prev[0] = 0
+    for iface in stats:
+        for stat_type in stats[iface]:
+            rx = numpy.array(stats[iface][stat_type]['rx'])
+            rx_prev = numpy.roll(rx, 1)
+            rx_prev[0] = 0.0
+            speed[iface][stat_type]['rx'] = (rx - rx_prev) /
+                                            (timestamps - timestamps_prev)
+
+            tx = numpy.array(stats[iface][stat_type]['tx'])
+            tx_prev = numpy.roll(tx, 1)
+            tx_prev[0] = 0.0
+            speed[iface][stat_type]['tx'] = tx - tx_prev) /
+                                            (timestamps - timestamps_prev)
+
+    # Prepare return, only if_octets for now
+    nr_asked = int((stop - start) / step)
+
+    speed = list(speed['eth0']['if_octets'])
+    speed = resize_stats(speed, nr_asked)
+
+    return {'eth0': speed}
 
     """
     res = {}
