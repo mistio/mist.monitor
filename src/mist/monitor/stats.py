@@ -17,7 +17,7 @@ from time import time
 #import math                # used in dummy
 #from random import gauss   # used in dummy
 import numpy
-from scipy import interpolate as scinterp
+from scipy import interpolate
 
 from logging import getLogger
 
@@ -29,31 +29,38 @@ from mist.monitor.config import MONGODB
 log = getLogger('mist.monitor')
 
 
-def pad_zeros(stats, old_size, new_size):
-    """Pads zeros to create a new array from stats with size == new_size."""
-    for stat in stats:
-        padded = numpy.zeros(new_size)
-        padded[-old_size::] = stats[stat]
-        stats[stat] = padded
+def resize_stats(stats, nr_requested):
+    """Returns stats that match the requested size.
 
-    return stats
+    If the requested equal the available simply return them. If they are less
+    than the requested pad zeros and if they are more use spline interpolation
+    to offer more accurate results.
 
+    The return value is a list so you can serve it directly in a JSON.
 
-def interpolate(stats, old_size, sampling_step):
-    """Returns interpolated stats, using spline interpolation
-
-    .. note:: This also applies abs() to the returned values
+    .. note:: In spline interpolation this also applies abs() to the returned
+              values, so be careful if there are negative values to return.
     """
-    x_axis = numpy.arange(old_size)
-    new_x_axis = numpy.arange(0, old_size, sampling_step)
+    nr_available = len(stats)
 
-    for stat in stats:
-        fitted = scinterp.splrep(x_axis, stats[stat])
-        stats[stat] = scinterp.splev(new_x_axis, fitted, der=0)
-        # FIXME: is this useful for every case?
-        stats[stat] = numpy.abs(stats[stat])
-
-    return stats
+    if nr_available == nr_requested:
+        return stats
+    elif nr_available < nr_requested:
+        # pad zeros
+        stats = numpy.array(stats)
+        resized_stats = numpy.zeros(nr_requested)
+        resized_stats[-nr_available::] = stats
+        return list(resized_stats)
+    else:
+        # use spline interpolation
+        stats = numpy.array(stats)
+        x_axis = numpy.arange(nr_available)
+        spline = interpolate.splrep(x_axis, stats)
+        sampling_step = float(nr_available) / nr_requested
+        new_x_axis = numpy.arange(0, nr_available, sampling_step)
+        resized_stats = interpolate.splev(new_x_axis, spline, der=0)
+        resized_stats = numpy.abs(resized_stats)
+        return list(resized_stats)
 
 
 def mongo_get_cpu_stats(db, uuid, start, stop, step):
@@ -144,40 +151,11 @@ def mongo_get_load_stats(db, uuid, start, stop, step):
         stats['longterm'].append(doc['values'][2])
 
     nr_asked = int((stop - start)/step)
-    nr_returned =len(stats['shortterm'])
+    calc_stats = {}
+    for stat in stats:
+        calc_stats[stat] = resize_stats(stats[stat], nr_asked)
 
-    if nr_asked == nr_returned:
-        # All values
-        # ----------
-        # return stats
-
-        # Most important values
-        # ---------------------
-        return stats['shortterm']
-    else:
-        calc_stats = {
-            'shortterm': numpy.array(stats['shortterm']),
-            'midterm': numpy.array(stats['midterm']),
-            'longterm': numpy.array(stats['longterm'])
-        }
-        if nr_returned < nr_asked:
-            calc_stats = pad_zeros(calc_stats, nr_returned, nr_asked)
-        else:
-            # When nr_returned > nr_asked:
-            sampling_step = nr_returned * float(step) / (stop - start)
-            calc_stats = interpolate(calc_stats, nr_returned, sampling_step)
-
-        # All values
-        # ----------
-        # stats = {
-        #     'shortterm': list(calc_stats['shortterm']),
-        #     'midterm': list(calc_stats['midterm']),
-        #     'longterm': list(calc_stats['longterm'])
-        # }
-
-        # Most important values
-        # ---------------------
-        return list(calc_stats['shortterm'])
+    return calc_stats['shortterm']
 
 
 def mongo_get_memory_stats(db, uuid, start, stop, step):
@@ -200,52 +178,19 @@ def mongo_get_memory_stats(db, uuid, start, stop, step):
         'used': [],
         'cached':[],
         'buffered': [],
-        'total': 0
     }
 
     for doc in docs:
         stats[doc['type_instance']].append(doc['values'][0])
 
+    total_memory = stats['free'][0] + stats['used'][0]
+
     nr_asked = int((stop - start)/step)
-    nr_returned =len(stats['free'])
+    calc_stats = {}
+    for stat in stats:
+        calc_stats[stat] = resize_stats(stats[stat], nr_asked)
 
-    stats['total'] = stats['free'][0] + stats['used'][0]
-
-    if nr_asked == nr_returned:
-        # All values
-        # ----------
-        # return stats
-
-        # Most important values
-        # ---------------------
-        return {'used': stats['used'], 'total': stats['total']}
-    else:
-        calc_stats = {
-            'free': numpy.array(stats['free']),
-            'used': numpy.array(stats['used']),
-            'cached': numpy.array(stats['cached']),
-            'buffered': numpy.array(stats['buffered'])
-        }
-        if nr_returned < nr_asked:
-            calc_stats = pad_zeros(calc_stats, nr_returned, nr_asked)
-        else:
-            # When nr_returned > nr_asked:
-            sampling_step = nr_returned * float(step) / (stop - start)
-            calc_stats = interpolate(calc_stats, nr_returned, sampling_step)
-
-        # All values
-        # ----------
-        # stats = {
-        #     'free': list(calc_stats['free']),
-        #     'used': list(calc_stats['used']),
-        #     'cached': list(calc_stats['cached'])
-        #     'buffered': list(calc_stats['buffered'])
-        #     'total': stats['total'])
-        # }
-
-        # Most important values
-        # ---------------------
-        return {'used': list(calc_stats['used']), 'total': stats['total']}
+    return {'used': calc_stats['used'], 'total': total_memory}
 
 
 def calculate_network_speed(previous, current):
