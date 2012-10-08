@@ -64,6 +64,98 @@ def resize_stats(stats, nr_requested):
 
 
 def mongo_get_cpu_stats(db, uuid, start, stop, step):
+    """Returns machine's cpu stats from mongo.
+
+    Initially stats get populated from the query results like this::
+
+        stats = {
+            '0': {
+                'user': [...],
+                'nice': [...],
+                'system': [...],
+                'idle': [...],
+                'wait': [...],
+                'interrupt': [...],
+                'softirq': [...],
+                'steal': [...]
+            },
+
+            ....,
+
+            'N': {
+                ....
+            }
+        }
+
+    where 0, ..., N are the available cores.
+
+    Then cpu utilization is calculated with::
+
+        ((total - idle)_t - (total - idle)_t-1) / (total_t - total_t-1)
+
+    .. note:: Although it collects all, it returns only a list of total cpu
+              utilization across all cores and the number of available cores,
+              for smaller response size.
+    """
+    query_dict = {
+        'host': uuid,
+        'time': {
+            '$gte': datetime.fromtimestamp(int(start)),
+            '$lt': datetime.fromtimestamp(int(stop))
+        }
+    }
+    docs = db.cpu.find(query_dict).sort('time', DESCENDING)
+
+    stats = {}
+
+    for doc in docs:
+        stat_type = doc['type_instance']
+        stat_value = float(doc['values'][0])
+        core = doc['plugin_instance']
+        if not stats.get(core, None):
+            stats[core] = {}
+        if not stats[core].get(stat_type, None):
+            stats[core][stat_type] = []
+            stats[core][stat_type].append(stat_value)
+        else:
+            stats[core][stat_type].append(stat_value)
+
+    nr_cores = 0
+    utilization = {}
+    for core in stats:
+        # counting how many cores are there
+        nr_cores += 1
+        # Arrange stats in a 2D array where each line is a stat type and each
+        # column a timestamp. Every row should have the same length. The first
+        # row will be full of zeros, just to enable vstacking.
+        2d_stats = numpy.zeros(len(status[core]['user']))
+        for stat_type in stats[core]:
+            row = numpyarray(stats[core][stat_type])
+            2d_stats = numpy.vstack(2d_stats, row)
+        # sum along every column
+        totals = 2d_stats.sum(0)
+        idles = numpy.array(stats[core]['idle'])
+        # roll to create total_t-1, where values don't exist put zero
+        totals_prev = numpy.roll(totals, 1)
+        total_prev[0] = 0.0
+        idles_prev = numpy.roll(idles, 1)
+        idles_prev[0] = 0.0
+        utilization[core] = ((totals - idles) - (totals_prev - idles_prev)) /
+                            (totals - totals_prev)
+        utilization[core] = numpy.abs(utilization[core])
+
+    # sum utilization across all cores
+    sum_utilization = numpy.zeros(utilization['0'].shape[0])
+    for core in stats:
+        sum_utilization += utilization[core]
+
+    nr_asked = int((stop - start)/step)
+    sum_utilization = list(sum_utilization)
+    sum_utilization = resize_stats(sum_utilization, nr_asked)
+
+    return {'utilization': sum_utilization, 'cores': nr_cores}
+
+    """
     res = {}
     nr_values_asked = int((stop - start)/step)
     ret = {'total': [],'util': [],'total_diff':[] ,'used_diff': [] ,
@@ -122,6 +214,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
     ret['util'] = list(calc_util)
 
     return ret
+    """
 
 
 def mongo_get_load_stats(db, uuid, start, stop, step):
