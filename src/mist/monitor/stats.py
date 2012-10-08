@@ -135,7 +135,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         # sum along every column
         totals = 2d_stats.sum(0)
         idles = numpy.array(stats[core]['idle'])
-        # roll to create total_t-1, where values don't exist put zero
+        # roll to create total_t-1, replace values that don't exist with zero
         totals_prev = numpy.roll(totals, 1)
         total_prev[0] = 0.0
         idles_prev = numpy.roll(idles, 1)
@@ -295,7 +295,31 @@ def calculate_network_speed(previous, current):
 """
 
 def mongo_get_network_stats(db, uuid, start, stop, step):
- """Returns machine's network stats from mongo.
+    """Returns machine's network stats from mongo.
+
+    Initially stats get populated from the query results like this::
+
+        stats = {
+            'lo': {
+                'rx': [...],
+                'tx': [...],
+                'timestamp': [...]
+            },
+
+            'eth0': {
+                'rx': [...],
+                'tx': [...],
+                'timestamp': [...]
+            },
+
+            ....,
+
+            'ethN': {
+                ....
+            }
+        }
+
+    The basic keys are the available network interfaces.
 
     .. note:: Although it collects all, it returns only the summed speed of
               all available interfaces (e.g. eth0, eth1 etc.), for smaller
