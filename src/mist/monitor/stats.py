@@ -36,24 +36,23 @@ def resize_stats(stats, nr_requested):
     than the requested pad zeros and if they are more use spline interpolation
     to offer more accurate results.
 
-    The return value is a list so you can serve it directly in a JSON.
+    The stats argument must be a numpy.array() object and the return value is
+    a list so you can serve directly in a JSON.
 
     .. note:: In spline interpolation this also applies abs() to the returned
               values, so be careful if there are negative values to return.
     """
-    nr_available = len(stats)
+    nr_available = stats.shape[0]
 
     if nr_available == nr_requested:
-        return stats
+        return list(stats)
     elif nr_available < nr_requested:
         # pad zeros
-        stats = numpy.array(stats)
         resized_stats = numpy.zeros(nr_requested)
         resized_stats[-nr_available::] = stats
         return list(resized_stats)
     else:
         # use spline interpolation
-        stats = numpy.array(stats)
         x_axis = numpy.arange(nr_available)
         spline = interpolate.splrep(x_axis, stats)
         sampling_step = float(nr_available) / nr_requested
@@ -148,8 +147,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
     for core in stats:
         sum_utilization += utilization[core]
 
-    nr_asked = int((stop - start)/step)
-    sum_utilization = list(sum_utilization)
+    nr_asked = int((stop - start) / step)
     sum_utilization = resize_stats(sum_utilization, nr_asked)
 
     return {'utilization': sum_utilization, 'cores': nr_cores}
@@ -242,12 +240,12 @@ def mongo_get_load_stats(db, uuid, start, stop, step):
         stats['midterm'].append(doc['values'][1])
         stats['longterm'].append(doc['values'][2])
 
-    nr_asked = int((stop - start)/step)
-    calc_stats = {}
-    for stat in stats:
-        calc_stats[stat] = resize_stats(stats[stat], nr_asked)
+    # Prepare return, only shortterm for now
+    nr_asked = int((stop - start) / step)
+    shortterm = numpy.array(stats['shortterm'])
+    shortterm = resize_stats(shortterm, nr_asked)
 
-    return calc_stats['shortterm']
+    return [shortterm]
 
 
 def mongo_get_memory_stats(db, uuid, start, stop, step):
@@ -275,14 +273,14 @@ def mongo_get_memory_stats(db, uuid, start, stop, step):
     for doc in docs:
         stats[doc['type_instance']].append(doc['values'][0])
 
+    # Prepare return, only used and total for now
     total_memory = stats['free'][0] + stats['used'][0]
 
-    nr_asked = int((stop - start)/step)
-    calc_stats = {}
-    for stat in stats:
-        calc_stats[stat] = resize_stats(stats[stat], nr_asked)
+    nr_asked = int((stop - start) / sstep)
+    used = numpy.array(stats['used'])
+    used = resize_stats(used, nr_asked)
 
-    return {'used': calc_stats['used'], 'total': total_memory}
+    return {'used': used, 'total': total_memory}
 
 """
 def calculate_network_speed(previous, current):
