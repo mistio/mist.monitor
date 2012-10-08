@@ -379,7 +379,7 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
             tx = numpy.array(stats[iface][stat_type]['tx'])
             tx_prev = numpy.roll(tx, 1)
             tx_prev[0] = 0.0
-            speed[iface][stat_type]['tx'] = tx - tx_prev) /\
+            speed[iface][stat_type]['tx'] = (tx - tx_prev) /\
                                             (timestamps - timestamps_prev)
 
     # Prepare return, only if_octets for now
