@@ -130,7 +130,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         # row will be full of zeros, just to enable vstacking.
         2d_stats = numpy.zeros(len(status[core]['user']))
         for stat_type in stats[core]:
-            row = numpyarray(stats[core][stat_type])
+            row = numpy.array(stats[core][stat_type])
             2d_stats = numpy.vstack(2d_stats, row)
         # sum along every column
         totals = 2d_stats.sum(0)
@@ -285,17 +285,33 @@ def mongo_get_memory_stats(db, uuid, start, stop, step):
 
     return {'used': calc_stats['used'], 'total': total_memory}
 
-
+"""
 def calculate_network_speed(previous, current):
 
     bytes_diff = (current['value'] - previous['value'])
     timestamp_diff = (current['timestamp'] - previous['timestamp'])
 
     return float(bytes_diff) / timestamp_diff
-
+"""
 
 def mongo_get_network_stats(db, uuid, start, stop, step):
+ """Returns machine's network stats from mongo.
 
+    .. note:: Although it collects all, it returns only the summed speed of
+              all available interfaces (e.g. eth0, eth1 etc.), for smaller
+              response size.
+    """
+    query_dict = {
+        'host': uuid,
+        'time': {
+            '$gte': datetime.fromtimestamp(int(start)),
+            '$lt': datetime.fromtimestamp(int(stop))
+        }
+    }
+    docs = db.interface.find(query_dict).sort('time', DESCENDING)
+
+
+    """
     res = {}
     nr_values_asked = int((stop - start)/step)
 
@@ -358,6 +374,7 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
         prev = curr
 
     return ret
+    """
 
 
 def mongo_get_stats(uuid, expression, start, stop, step):
