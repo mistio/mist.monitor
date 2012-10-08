@@ -14,8 +14,6 @@ return is the following:
 from datetime import datetime
 from time import time
 
-#import math                # used in dummy
-#from random import gauss   # used in dummy
 import numpy
 from scipy import interpolate
 
@@ -561,42 +559,38 @@ def graphite_get_stats(uuid, expression, start, stop, step):
 def dummy_get_stats(expression, start, stop, step):
     """Returns simulated stats.
 
-    .. warning:: I doesn't work, needs rewrite to fit the client API
+    .. warning:: Needs more realistic values in network and memory
     """
-    """
-    interval = 5000 # in milliseconds
-    timestamp = time() * 1000 # from seconds to milliseconds
-    # check if you just need an update or the full list
-    changes_since = request.GET.get('changes_since', None)
+    nr_asked = int((stop - start) / step)
 
-    if changes_since:
-        # how many samples were created in this interval
-        samples = timestamp - float(changes_since)
-        samples = math.floor(samples / interval)
-        samples = int(samples)
-    else:
-        # set maximum number of samples
-        samples = 1000
+    cpu_cores = numpy.random.randint(0, 10)
+    cpu_util = list(numpy.random.rand(nr_asked) * cpu_cores)
 
-    cpu = []
-    load = []
-    memory = []
-    disk = []
+    load = list(numpy.random.rand(nr_asked))
 
-    for i in range(0, samples):
-        cpu.append(abs(gauss(70.0, 5.0)))
-        load.append(abs(gauss(4.0, 0.02)))
-        memory.append(abs(gauss(4000.0, 10.00)))
-        disk.append(abs(gauss(40.0, 3.0)))
+    memory_total = numpy.random.randint(128000000, 128000000 * 10)
+    memory_used = numpy.random.rand(nr_asked) * memory_total
+    memory_used = list(memory_used)
 
-    ret = {'timestamp': timestamp,
-           'interval': interval,
-           'cpu': cpu,
-           'load': load,
-           'memory': memory,
-           'disk': disk}
+    network_rx = list(numpy.random.rand(nr_asked) * 1000)
+    network_tx = list(numpy.random.rand(nr_asked) * 1000)
 
-    log.info(ret)
-    return ret
-    """
-    return {}
+    stats = {
+        'cpu': {
+            'utilization': cpu_util,
+            'cores': cpu_cores
+        },
+        'load': load,
+        'memory': {
+            'used': memory_used,
+            'total': memory_total
+        },
+        'network': {
+            'eth0': {
+                'rx': network_rx,
+                'tx': network_tx
+            }
+        }
+    }
+
+    return stats
