@@ -47,15 +47,21 @@ def resize_stats(stats, nr_requested):
     elif nr_available < nr_requested:
         # pad zeros
         resized_stats = numpy.zeros(nr_requested)
-        resized_stats[-nr_available::] = stats
+        if nr_requested != 0:
+            resized_stats[-nr_available::] = stats
     else:
-        # use spline interpolation
-        x_axis = numpy.arange(nr_available)
-        spline = interpolate.splrep(x_axis, stats)
+        # use spline interpolation, if it is possible to solve
         sampling_step = float(nr_available) / nr_requested
-        new_x_axis = numpy.arange(0, nr_available, sampling_step)
-        resized_stats = interpolate.splev(new_x_axis, spline, der=0)
-        resized_stats = numpy.abs(resized_stats)
+        try:
+            x_axis = numpy.arange(nr_available)
+            spline = interpolate.splrep(x_axis, stats)
+            new_x_axis = numpy.arange(0, nr_available, sampling_step)
+            resized_stats = interpolate.splev(new_x_axis, spline, der=0)
+            resized_stats = numpy.abs(resized_stats)
+        except:
+            log.warn('Unable to solve spline')
+            resized_stats = stat[0::sampling_step]
+
 
     if resized_stats.shape:
         return list(resized_stats)
