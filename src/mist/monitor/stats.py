@@ -264,27 +264,27 @@ def mongo_get_disk_stats(db, uuid, start, stop, step):
     docs = db.df.find(query_dict).sort('time', DESCENDING)
 
     stats = {}
-    used = {}
-    total = {}
 
     for doc in docs:
         fs = doc['type_instance']
-        used = float(doc['values'][0])
-        free = float(doc['values'][1])
+        used_val = float(doc['values'][0])
+        free_val = float(doc['values'][1])
         if not stats.get(fs, None):
             stats[fs] = {
-                'used': [used],
-                'free': [free],
-                'total': [free + used]
+                'used': [used_val],
+                'free': [free_val],
+                'total': [free_val + used_val]
             }
         else:
-            stats[fs]['used'].append(used)
-            stats[fs]['free'].append(free)
-            stats[fs]['total'].append(used+free)
+            stats[fs]['used'].append(used_val)
+            stats[fs]['free'].append(free_val)
+            stats[fs]['total'].append(used_val + free_val)
 
     # Prepare return, only used and total for now
     nr_asked = int((stop - start) / step) + 1
 
+    used = {}
+    total = {}
     for fs in stats:
         used[fs] = resize_stats(numpy.array(stats[fs]['used']), nr_asked)
         total[fs] = resize_stats(numpy.array(stats[fs]['total']), nr_asked)
