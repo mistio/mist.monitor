@@ -358,7 +358,7 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
                 'rx': [float(doc['values'][0])],
                 'tx': [float(doc['values'][1])]
             }
-            timestamps.append(doc['time'].strftime("%s"))
+            timestamps.append(int(doc['time'].strftime("%s")))
         else:
             stats[iface][stat_type]['rx'].append(float(doc['values'][0]))
             stats[iface][stat_type]['tx'].append(float(doc['values'][1]))
