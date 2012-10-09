@@ -130,7 +130,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         arr_stats = numpy.zeros(len(stats[core]['user']))
         for stat_type in stats[core]:
             row = numpy.array(stats[core][stat_type])
-            arr_stats = numpy.vstack(arr_stats, row)
+            arr_stats = numpy.vstack((arr_stats, row))
         # sum along every column
         totals = arr_stats.sum(0)
         idles = numpy.array(stats[core]['idle'])
