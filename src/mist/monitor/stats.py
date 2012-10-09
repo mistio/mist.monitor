@@ -353,7 +353,6 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
         stat_type = doc['type']
         if not stats.get(iface, None):
             stats[iface] = {}
-        iface_type
         if not stats[iface].get(stat_type, None):
             stats[iface][stat_type] = {
                 'rx': [float(doc['values'][0])],
