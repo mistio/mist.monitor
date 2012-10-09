@@ -136,7 +136,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         idles = numpy.array(stats[core]['idle'])
         # roll to create total_t-1, replace values that don't exist with zero
         totals_prev = numpy.roll(totals, 1)
-        total_prev[0] = 0.0
+        totals_prev[0] = 0.0
         idles_prev = numpy.roll(idles, 1)
         idles_prev[0] = 0.0
         utilization[core] = ((totals - idles) - (totals_prev - idles_prev)) /\
