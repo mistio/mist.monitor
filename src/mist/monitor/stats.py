@@ -43,12 +43,11 @@ def resize_stats(stats, nr_requested):
     nr_available = stats.shape[0]
 
     if nr_available == nr_requested:
-        return list(stats)
+        resized_stats = stats
     elif nr_available < nr_requested:
         # pad zeros
         resized_stats = numpy.zeros(nr_requested)
         resized_stats[-nr_available::] = stats
-        return list(resized_stats)
     else:
         # use spline interpolation
         x_axis = numpy.arange(nr_available)
@@ -57,8 +56,12 @@ def resize_stats(stats, nr_requested):
         new_x_axis = numpy.arange(0, nr_available, sampling_step)
         resized_stats = interpolate.splev(new_x_axis, spline, der=0)
         resized_stats = numpy.abs(resized_stats)
-        return list(resized_stats)
 
+    if resized_stats.shape:
+        return list(resized_stats)
+    else:
+        # if resized stats is a single number then list() will fail
+        return [resized_stats]
 
 def mongo_get_cpu_stats(db, uuid, start, stop, step):
     """Returns machine's cpu stats from mongo.
