@@ -158,67 +158,6 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
 
     return {'utilization': sum_utilization, 'cores': nr_cores}
 
-    """
-    res = {}
-    nr_values_asked = int((stop - start)/step)
-    ret = {'total': [],'util': [],'total_diff':[] ,'used_diff': [] ,
-                'used' : [] }
-
-    query_dict = {'host': uuid,
-                  'time': {"$gte": datetime.fromtimestamp(int(start)),
-                           "$lt": datetime.fromtimestamp(int(stop)) }}
-
-    res = db.cpu.find(query_dict).sort('time', DESCENDING)
-
-    prev = None
-    set_of_cpus = []
-    for r in res:
-        curr = r['time']
-        index = r['type_instance']
-        value = r['values']
-        cpu_no = r['plugin_instance']
-        if not ret.get(index, None):
-            ret[index] = value
-        else:
-            ret[index].extend(value)
-
-        if cpu_no not in set_of_cpus:
-            set_of_cpus.append(cpu_no)
-
-        if prev != curr:
-            ret['total'].append(0)
-            ret['used'].append(0)
-
-        if index != 'idle':
-            ret['used'][-1] += float(value[0])
-        ret['total'][-1] += value[0]
-        prev = curr
-
-    for j in range(1, len(ret['total'])):
-        i = len(ret['total']) -1 - j
-        ret['total_diff'].append  (abs(ret['total'][i-1] - ret['total'][i]))
-        ret['used_diff'].append(abs(ret['used'][i-1] - ret['used'][i]))
-
-    used_diff = numpy.array(ret['used_diff'])
-    total_diff = numpy.array(ret['total_diff'])
-    util = used_diff / total_diff
-    calc_util = util
-
-    if util.shape[0] < nr_values_asked:
-        calc_util = numpy.zeros(nr_values_asked)
-        calc_util[-util.shape[0]::] = util
-    elif util.shape[0] > nr_values_asked:
-        x_axis = numpy.arange(util.shape[0])
-        tck = scinterp.splrep(x_axis, util)
-        new_x_axis = numpy.arange(0, util.shape[0], util.shape[0] * float(step)/(stop-start))
-        calc_util = scinterp.splev(new_x_axis, tck, der=0)
-        calc_util = numpy.abs(calc_util)
-
-    ret['util'] = list(calc_util)
-
-    return ret
-    """
-
 
 def mongo_get_load_stats(db, uuid, start, stop, step):
     """Returns machine's load stats from mongo.
@@ -330,14 +269,6 @@ def mongo_get_memory_stats(db, uuid, start, stop, step):
 
     return {'used': used, 'total': total_memory}
 
-"""
-def calculate_network_speed(previous, current):
-
-    bytes_diff = (current['value'] - previous['value'])
-    timestamp_diff = (current['timestamp'] - previous['timestamp'])
-
-    return float(bytes_diff) / timestamp_diff
-"""
 
 def mongo_get_network_stats(db, uuid, start, stop, step):
     """Returns machine's network stats from mongo.
@@ -446,71 +377,6 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
     tx_speed = resize_stats(speed['eth0']['if_octets']['tx'], nr_asked)
 
     return {'eth0': {'rx': rx_speed, 'tx': tx_speed}}
-
-    """
-    res = {}
-    nr_values_asked = int((stop - start)/step)
-
-    query_dict = {'host': uuid,
-                  'time': {"$gte": datetime.fromtimestamp(int(start)),
-                           "$lt": datetime.fromtimestamp(int(stop)) }}
-
-    #XXX: No need to use limit, we just return all values in the requested time range
-    res = db.interface.find(query_dict).sort('time', DESCENDING)
-    #.limit(2*8*(int((stop-start)/step)))
-
-    ret = { }
-    set_of_ifaces = db.interface.distinct('type_instance') #db.interface.distinct('type_instance', {'host':uuid})
-    set_of_fields = db.interface.distinct('dsnames')
-    set_of_data = db.interface.distinct('type')
-    if "" in set_of_ifaces:
-        set_of_ifaces.remove("")
-
-    for iface in set_of_ifaces:
-        ret[iface] = {}
-        ret[iface]['total'] = []
-        ret['timestamp'] = []
-        ret[iface]['speed'] = {'rx': [], 'tx': [] }
-
-        for index in set_of_data:
-            ret[iface][index] = {}
-            for field in set_of_fields:
-               ret[iface][index][field] = []
-    current = { 'value': [], 'timestamp': 0}
-    previous = { 'value': [], 'timestamp': 0}
-
-    prev = None
-    for r in res:
-        curr = r['time']
-        iface = r['type_instance']
-        value = r['values']
-        index = r['type']
-
-        if prev != curr:
-            ret[iface]['total'].append(0)
-            ret['timestamp'].append(curr.strftime("%s"))
-
-        if not ret.get(index, None):
-            for field in set_of_fields:
-                #get values for ['rx'] and ['tx'], use .index(field) to get
-                #the idx of the relevant field
-                list_ptr = ret[iface][index][field]
-                idx = set_of_fields.index(field)
-                list_ptr.append(value[idx])
-                nr_stored = len(list_ptr)
-                #ugly check to make sure we have 2 or more values to calculate
-                #the diff
-                if nr_stored > 1 and index == 'if_octets':
-                    current['value'] = list_ptr[-1]
-                    previous['value'] = list_ptr[-2]
-                    current['timestamp'] = int(ret['timestamp'][-1])
-                    previous['timestamp'] = int(ret['timestamp'][-2])
-                    speed = calculate_network_speed(current, previous)
-                    ret[iface]['speed'][field].append(speed)
-        prev = curr
-
-    return ret
-    """
 
 
 def mongo_get_stats(uuid, expression, start, stop, step):
