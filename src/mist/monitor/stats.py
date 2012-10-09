@@ -248,6 +248,50 @@ def mongo_get_load_stats(db, uuid, start, stop, step):
     return shortterm
 
 
+def mongo_get_disk_stats(db, uuid, start, stop, step):
+    """Returns machine's memory stats from mongo.
+
+    .. note:: Although it collects all, it returns only a list of memory used
+              and a single number for total memory, for smaller response size.
+    """
+    query_dict = {
+        'host': uuid,
+        'time': {
+            '$gte': datetime.fromtimestamp(int(start)),
+            '$lt': datetime.fromtimestamp(int(stop))
+        }
+    }
+    docs = db.df.find(query_dict).sort('time', DESCENDING)
+
+    stats = {}
+    used = {}
+    total = {}
+
+    for doc in docs:
+        fs = doc['type_instance']
+        used = float(doc['values'][0])
+        free = float(doc['values'][1])
+        if not stats.get(fs, None):
+            stats[fs] = {
+                'used': [used],
+                'free': [free],
+                'total': [free + used]
+            }
+        else:
+            stats[fs]['used'].append(used)
+            stats[fs]['free'].append(free)
+            stats[fs]['total'].append(used+free)
+
+    # Prepare return, only used and total for now
+    nr_asked = int((stop - start) / step) + 1
+
+    for fs in stats:
+        used[fs] = resize_stats(numpy.array(stats[fs]['used']), nr_asked)
+        total[fs] = resize_stats(numpy.array(stats[fs]['total']), nr_asked)
+
+    return {'used': used, 'total': total}
+
+
 def mongo_get_memory_stats(db, uuid, start, stop, step):
     """Returns machine's memory stats from mongo.
 
@@ -276,7 +320,7 @@ def mongo_get_memory_stats(db, uuid, start, stop, step):
     # Prepare return, only used and total for now
     total_memory = stats['free'][0] + stats['used'][0]
 
-    nr_asked = int((stop - start) / sstep)
+    nr_asked = int((stop - start) / step)
     used = resize_stats(numpy.array(stats['used']), nr_asked)
 
     return {'used': used, 'total': total_memory}
@@ -482,6 +526,8 @@ def mongo_get_stats(uuid, expression, start, stop, step):
             stats[exp] = mongo_get_memory_stats(db, uuid, start, stop, step)
         if exp == 'network':
             stats[exp] = mongo_get_network_stats(db, uuid, start, stop, step)
+        if exp == 'disk':
+            stats[exp] = mongo_get_disk_stats(db, uuid, start, stop, step)
 
     return stats
 

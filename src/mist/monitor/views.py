@@ -154,7 +154,7 @@ def get_stats(request):
     if expression.__class__ in [str,unicode]:
         expression = [expression]
 
-    # step comes from te client in millisecs, convert it to secs
+    # step comes from the client in millisecs, convert it to secs
     step = int(request.params.get('step', 60000))
     step = int(step/1000)
 
