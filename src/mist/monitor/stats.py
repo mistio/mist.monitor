@@ -60,8 +60,7 @@ def resize_stats(stats, nr_requested):
             resized_stats = numpy.abs(resized_stats)
         except:
             log.warn('Unable to solve spline')
-            resized_stats = stat[0::sampling_step]
-
+            resized_stats = stats[0::sampling_step]
 
     if resized_stats.shape:
         return list(resized_stats)
