@@ -365,7 +365,10 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
             timestamps.append(int(doc['time'].strftime("%s")))
 
     speed = {}
-    timestamps = numpy.array(timestamps)
+    # this list will contain the same timestamp multiple times, so get the
+    # unique values only and mirror it to keep the order as it was
+    timestamps = numpy.unique(timestamps)
+    timpestamps = timestamps[::-1]
     timestamps_prev = numpy.roll(timestamps, 1)
     timestamps_prev[0] = 0
     for iface in stats:
