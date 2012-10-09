@@ -346,6 +346,7 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
     }
     docs = db.interface.find(query_dict).sort('time', DESCENDING)
 
+    stats = {}
     timestamps = []
     for doc in docs:
         iface = doc['type_instance']
