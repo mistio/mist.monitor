@@ -347,24 +347,26 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
     docs = db.interface.find(query_dict).sort('time', DESCENDING)
 
     stats = {}
+    speed = {}
     timestamps = []
     for doc in docs:
         iface = doc['type_instance']
         stat_type = doc['type']
         if not stats.get(iface, None):
             stats[iface] = {}
+            speed[iface] = {}
         if not stats[iface].get(stat_type, None):
             stats[iface][stat_type] = {
                 'rx': [float(doc['values'][0])],
                 'tx': [float(doc['values'][1])]
             }
+            speed[iface][stat_type] = {'rx': 0, 'tx': 0}
             timestamps.append(int(doc['time'].strftime("%s")))
         else:
             stats[iface][stat_type]['rx'].append(float(doc['values'][0]))
             stats[iface][stat_type]['tx'].append(float(doc['values'][1]))
             timestamps.append(int(doc['time'].strftime("%s")))
 
-    speed = {}
     # this list will contain the same timestamp multiple times, so get the
     # unique values only and mirror it to keep the order as it was
     timestamps = numpy.unique(timestamps)
