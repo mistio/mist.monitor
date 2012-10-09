@@ -3,6 +3,8 @@ var
 eggs
 develop-eggs
 bin
+lib
+include
 .project
 .installed.cfg
 *.egg-info
@@ -13,3 +15,4 @@ downloads
 conf/collectd.conf
 conf/collectd.conf.local
 conf/collectd.passwd
+conf/collectd_*
