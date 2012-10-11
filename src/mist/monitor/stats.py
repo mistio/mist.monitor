@@ -103,14 +103,14 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
               for smaller response size.
     """
 
-    #when asked one value, we have to get one more to 
+    #when asked one value, we have to get one more to
     #calculate the CPU utilization
     interval = 5
     query_dict_total = {
         "host": uuid,
         "time": {
             "$gte": datetime.fromtimestamp(int(start - interval)),
-            "$lt": datetime.fromtimestamp(int(stop)) 
+            "$lt": datetime.fromtimestamp(int(stop))
         }
     }
 
@@ -190,7 +190,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
     sum_utilization = numpy.zeros(nr_asked)
     for core in stats:
         #instead of adding up all utilizations per core and resizing afterwards,
-        #we resize each core's separate utilization and sum them up to account 
+        #we resize each core's separate utilization and sum them up to account
         #for missing values (see comments above -- ignore items)
         sum_utilization += resize_stats(utilization[core], nr_asked)
 
@@ -231,10 +231,97 @@ def mongo_get_load_stats(db, uuid, start, stop, step):
 
 
 def mongo_get_disk_stats(db, uuid, start, stop, step):
-    """Returns machine's memory stats from mongo.
+    """Returns machine's disk stats from mongo.
 
-    .. note:: Although it collects all, it returns only a list of memory used
-              and a single number for total memory, for smaller response size.
+    """
+
+    query_dict = {
+        "host": uuid,
+        "time": {
+            "$gte": datetime.fromtimestamp(int(start)),
+            "$lt": datetime.fromtimestamp(int(stop))
+        }
+    }
+
+    group_dict = {
+        "$group": {
+            "_id": {
+                "plugin_instance": "$plugin_instance",
+                "time": "$time"
+            },
+            "user_values": {
+                '$push': "$values"
+            },
+            "stat_type": {
+                '$push': "$type"
+            }
+        }
+    }
+
+    #we explicitely need to sort the result. Maybe we need to do that
+    #in the cpu case too
+    sort_dict = {
+        "$sort": {
+            "time": -1,
+            "_id": -1
+        }
+    }
+
+    #get number of different stat types
+    stat_types = db.disk.find(query_dict).distinct("type")
+
+    #build the form of the aggregate query
+    pipeline = [{"$match": query_dict}, group_dict, sort_dict]
+
+    #do the actual query
+    res = db.command('aggregate', 'disk', pipeline=pipeline)
+
+    #pretify
+    res_ptr = res['result']
+    if len(res_ptr) < 2:
+        log.warn("Cannot return just one value :S")
+        return {'read': [], 'write': [], 'disks': None }
+
+    stats = { 'read': {}, 'write': {}}
+    for row in res_ptr:
+        stat_type = row['stat_type']
+        #timestamp = row['_id']['time']
+        disk = row['_id']['plugin_instance']
+        val_list = row['user_values']
+        if len(val_list) != len(stat_types):
+           #FIXME: if we don't want to ignore these values, we have to
+           #find a way to produce dummy values for the missing items
+           log.warn("Will ignore this item -- invalid: %s" %row)
+           continue
+        if not stats['read'].get(disk, None):
+            stats['read'][disk] = {}
+        if not stats['write'].get(disk, None):
+            stats['write'][disk] = {}
+        for stat in stat_type:
+            if not stats['read'][disk].get(stat, None):
+                stats['read'][disk][stat] = []
+            if not stats['write'][disk].get(stat, None):
+                stats['write'][disk][stat] = []
+
+            ptr_read = stats['read'][disk][stat]
+            ptr_read.append(val_list[stat_type.index(stat)][0])
+
+            ptr_write = stats['write'][disk][stat]
+            ptr_write.append(val_list[stat_type.index(stat)][1])
+
+    # Prepare return, only used and total for now
+    nr_asked = int((stop - start) / step)
+    read = stats['read']
+    write = stats['write']
+
+    return {'read': read, 'write': write, 'disks': len(stats['read'])}
+
+
+def mongo_get_df_stats(db, uuid, start, stop, step):
+    """Returns machine's df stats from mongo.
+
+    .. note:: Although it collects all, it returns only a list of FS used
+              and a single number for total FS, for smaller response size.
     """
     query_dict = {
         'host': uuid,
@@ -435,6 +522,8 @@ def mongo_get_stats(uuid, expression, start, stop, step):
             stats[exp] = mongo_get_memory_stats(db, uuid, start, stop, step)
         if exp == 'network':
             stats[exp] = mongo_get_network_stats(db, uuid, start, stop, step)
+        if exp == 'df':
+            stats[exp] = mongo_get_df_stats(db, uuid, start, stop, step)
         if exp == 'disk':
             stats[exp] = mongo_get_disk_stats(db, uuid, start, stop, step)
 

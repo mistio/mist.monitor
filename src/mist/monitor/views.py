@@ -152,13 +152,18 @@ def get_stats(request):
     expression = request.params.get('expression',
                                     ['cpu', 'load', 'memory', 'disk', 'network'])
     if expression.__class__ in [str,unicode]:
-        expression = [expression]
+        #expression = [expression]
+        expression = expression.split(',')
 
     # step comes from the client in millisecs, convert it to secs
     step = int(request.params.get('step', 60000))
     if (step > 1000):
-        log.warn("We got step < 1000, maybe the client meant seconds ;-)")
         step = int(step/1000)
+    elif step == 0:
+        log.warn("We got step == 0, maybe the client is broken ;S, using default")
+        step = 60
+    else:
+        log.warn("We got step < 1000, maybe the client meant seconds ;-)")
 
     stop = int(request.params.get('stop', int(time())))
     start = int(request.params.get('start', stop - step))
