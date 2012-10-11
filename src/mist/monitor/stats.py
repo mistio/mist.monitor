@@ -96,7 +96,7 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
 
     Then cpu utilization is calculated with::
 
-        ((total - idle)_t - (total - idle)_t-1) / (total_t - total_t-1)
+        ((total_t - total_(t-1)) - (idle_t - idle_(t-1)) / (total_t - total_t-1)
 
     .. note:: Although it collects all, it returns only a list of total cpu
               utilization across all cores and the number of available cores,
@@ -139,13 +139,19 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
 
     #pretify
     res_ptr = res['result']
+    if len(res_ptr) < 2:
+        log.warn("Cannot calculate CPU utilization with less than 2 values")
+        return {'utilization': [], 'cores': None }
 
     stats = {}
     for x in res_ptr:
         stat_type = x['stat_type']
+        #timestamp = x['_id']['time']
         core = x['_id']['plugin_instance']
         val_list = x['user_values']
         if len(val_list) != len(stat_types):
+           #FIXME: if we don't want to ignore these values, we have to
+           #find a way to produce dummy values for the missing items
            log.warn("Will ignore this item -- invalid: %s" %x)
            continue
         if not stats.get(core, None):
@@ -183,6 +189,9 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
     nr_asked = int((stop - start) / step)
     sum_utilization = numpy.zeros(nr_asked)
     for core in stats:
+        #instead of adding up all utilizations per core and resizing afterwards,
+        #we resize each core's separate utilization and sum them up to account 
+        #for missing values (see comments above -- ignore items)
         sum_utilization += resize_stats(utilization[core], nr_asked)
 
     return {'utilization':list(sum_utilization), 'cores': nr_cores}
