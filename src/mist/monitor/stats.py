@@ -102,27 +102,60 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
               utilization across all cores and the number of available cores,
               for smaller response size.
     """
-    query_dict = {
-        'host': uuid,
-        'time': {
-            '$gte': datetime.fromtimestamp(int(start)),
-            '$lt': datetime.fromtimestamp(int(stop))
+
+    #when asked one value, we have to get one more to 
+    #calculate the CPU utilization
+    interval = 5
+    query_dict_total = {
+        "host": uuid,
+        "time": {
+            "$gte": datetime.fromtimestamp(int(start - interval)),
+            "$lt": datetime.fromtimestamp(int(stop)) 
         }
     }
-    docs = db.cpu.find(query_dict).sort('time', DESCENDING)
+
+    group_dict = {
+        "$group": {
+            "_id": {
+                "plugin_instance": "$plugin_instance",
+                "time": "$time"
+            },
+            "user_values": {
+                '$push': "$values"
+            },
+            "stat_type": {
+                '$push': "$type_instance"
+            }
+        }
+    }
+
+    #get number of different stat types
+    stat_types = db.cpu.find(query_dict_total).distinct("type_instance")
+
+    #build the form of the aggregate query
+    pipeline = [{"$match": query_dict_total}, group_dict]
+    #do the actual query
+    res = db.command('aggregate', 'cpu', pipeline=pipeline)
+
+    #pretify
+    res_ptr = res['result']
 
     stats = {}
-
-    for doc in docs:
-        stat_type = doc['type_instance']
-        stat_value = float(doc['values'][0])
-        core = doc['plugin_instance']
+    for x in res_ptr:
+        stat_type = x['stat_type']
+        core = x['_id']['plugin_instance']
+        val_list = x['user_values']
+        if len(val_list) != len(stat_types):
+           log.warn("Will ignore this item -- invalid: %s" %x)
+           continue
         if not stats.get(core, None):
             stats[core] = {}
-        if not stats[core].get(stat_type, None):
-            stats[core][stat_type] = [stat_value]
-        else:
-            stats[core][stat_type].append(stat_value)
+        for stat in stat_type:
+            if not stats[core].get(stat, None):
+                stats[core][stat] = []
+
+            ptr = stats[core][stat]
+            ptr.extend(val_list[stat_type.index(stat)])
 
     nr_cores = 0
     utilization = {}
@@ -139,24 +172,20 @@ def mongo_get_cpu_stats(db, uuid, start, stop, step):
         # sum along every column
         totals = arr_stats.sum(0)
         idles = numpy.array(stats[core]['idle'])
-        # roll to create total_t-1, replace values that don't exist with zero
-        totals_prev = numpy.roll(totals, 1)
-        totals_prev[0] = 0.0
-        idles_prev = numpy.roll(idles, 1)
-        idles_prev[0] = 0.0
-        utilization[core] = ((totals - idles) - (totals_prev - idles_prev)) /\
+        # roll to create total_t-1, eg total = [a,b,c] -> prev = [b,c,a]
+        totals_prev = numpy.roll(totals, -1)
+        idles_prev = numpy.roll(idles, -1)
+        utilization[core] = ((totals - totals_prev) - (idles - idles_prev)) /\
                             (totals - totals_prev)
         utilization[core] = numpy.abs(utilization[core])
 
     # Prepare return, sum utilization across all cores
-    sum_utilization = numpy.zeros(utilization['0'].shape[0])
-    for core in stats:
-        sum_utilization += utilization[core]
-
     nr_asked = int((stop - start) / step)
-    sum_utilization = resize_stats(sum_utilization, nr_asked)
+    sum_utilization = numpy.zeros(nr_asked)
+    for core in stats:
+        sum_utilization += resize_stats(utilization[core], nr_asked)
 
-    return {'utilization': sum_utilization, 'cores': nr_cores}
+    return {'utilization':list(sum_utilization), 'cores': nr_cores}
 
 
 def mongo_get_load_stats(db, uuid, start, stop, step):

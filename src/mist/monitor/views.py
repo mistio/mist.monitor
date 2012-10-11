@@ -156,7 +156,9 @@ def get_stats(request):
 
     # step comes from the client in millisecs, convert it to secs
     step = int(request.params.get('step', 60000))
-    step = int(step/1000)
+    if (step > 1000):
+        log.warn("We got step < 1000, maybe the client meant seconds ;-)")
+        step = int(step/1000)
 
     stop = int(request.params.get('stop', int(time())))
     start = int(request.params.get('start', stop - step))
