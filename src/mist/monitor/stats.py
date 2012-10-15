@@ -388,10 +388,13 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
             stats[iface][stat_type]['tx'].append(float(doc['values'][1]))
             timestamps.append(int(doc['time'].strftime("%s")))
 
+    if not timestamps:
+        return {'eth0': {'rx': [], 'tx': []}}
+
     # this list will contain the same timestamp multiple times, so get the
     # unique values only and mirror it to keep the order as it was
     timestamps = numpy.unique(timestamps)
-    timpestamps = timestamps[::-1]
+    timestamps = timestamps[::-1]
     timestamps_prev = numpy.roll(timestamps, 1)
     timestamps_prev[0] = 0
     for iface in stats:
@@ -426,7 +429,6 @@ def mongo_get_stats(uuid, expression, start, stop, step):
 
     stats = {}
     for exp in expression:
-        #print exp
         if exp == 'cpu':
             stats[exp] = mongo_get_cpu_stats(db, uuid, start, stop, step)
         if exp == 'load':
