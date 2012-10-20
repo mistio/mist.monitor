@@ -7,7 +7,7 @@ BACKEND = 'mongodb' # or 'graphite' or 'dummy'
 
 MONGODB = {
     'host': 'localhost',
-    'port': 27017,
+    'port': 27021,
     'dbname': 'collectd'
 }
 
