@@ -49,6 +49,10 @@ def resize_stats(stats, nr_requested):
         resized_stats = numpy.zeros(nr_requested)
         if nr_requested != 0:
             resized_stats[-nr_available::] = stats
+        for x in range(resized_stats.shape[0] - len(stats) - 1,resized_stats.shape[0]):
+            if resized_stats[x] != resized_stats[x]:
+               log.warn("Got NaN for a value, zeroing it :S")
+               resized_stats[x] = 0
     else:
         # use spline interpolation, if it is possible to solve
         sampling_step = float(nr_available) / nr_requested
