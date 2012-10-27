@@ -462,7 +462,7 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
     speed = {}
     timestamps = []
     for doc in docs:
-        iface = doc['type_instance']
+        iface = doc['plugin_instance']
         stat_type = doc['type']
         if not stats.get(iface, None):
             stats[iface] = {}
