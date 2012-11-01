@@ -16,3 +16,8 @@ conf/collectd.conf
 conf/collectd.conf.local
 conf/collectd.passwd
 conf/collectd_*
+local/
+src/carbon/
+src/ceres/
+src/graphite-web/
+src/whisper/
