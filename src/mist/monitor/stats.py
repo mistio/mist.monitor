@@ -580,7 +580,7 @@ def graphite_get_stats(uuid, expression, start, stop, step):
         time_range = "from=%s&until=now" %(changes_since)
         #construct uri
         uri = graphite_uri + "/render?" + data_format + target_uri + time_range
-        #print uri
+        print uri
 
         r = requests.get(uri)
         if r.status_code == 200:
