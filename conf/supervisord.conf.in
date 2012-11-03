@@ -12,12 +12,12 @@ nocleanup = false
 environment = LD_LIBRARY_PATH=${buildout:directory}/parts/mongo-c-driver/lib,PERL5LIB=${buildout:directory}/parts/collectd/lib/perl5/:${buildout:directory}/parts/collectd-graphite/lib/perl5/
 
 [inet_http_server]
-port = 127.0.0.1:9001
+port = 127.0.0.1:9010
 username = mistiera
 password = 
 
 [supervisorctl]
-serverurl = http://127.0.0.1:9001
+serverurl = http://127.0.0.1:9010
 username = mistiera
 password = 
 
