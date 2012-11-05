@@ -7,7 +7,6 @@ from logging import getLogger
 from pyramid.view import view_config
 from pyramid.response import Response
 
-from mist.monitor.config import BACKEND
 from mist.monitor.stats import mongo_get_stats
 from mist.monitor.stats import graphite_get_stats
 from mist.monitor.stats import dummy_get_stats
@@ -169,14 +168,15 @@ def get_stats(request):
     start = int(request.params.get('start', stop - step))
 
     stats = {}
-    if BACKEND == 'mongodb':
-        stats = mongo_get_stats(uuid, expression, start, stop, step)
-    elif BACKEND == 'graphite':
-        stats = graphite_get_stats(uuid, expression, start, stop, step)
-    elif BACKEND == 'dummy':
+    backend = request.registry.settings['backend']
+    if backend['type'] == 'mongodb':
+        stats = mongo_get_stats(backend, uuid, expression, start, stop, step)
+    elif backend['type'] == 'graphite':
+        stats = graphite_get_stats(backend, uuid, expression, start, stop, step)
+    elif backend == 'dummy':
         stats = dummy_get_stats(expression, start, stop, step)
     else:
-        log.error('Requested invalid monitoring backend: %s' % BACKEND)
+        log.error('Requested invalid monitoring backend: %s' % backend)
         return Response('Service unavailable', 503)
 
     return stats

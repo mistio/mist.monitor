@@ -21,7 +21,6 @@ from logging import getLogger
 
 from pymongo import Connection
 from pymongo import DESCENDING
-from mist.monitor.config import MONGODB
 
 
 log = getLogger('mist.monitor')
@@ -511,12 +510,12 @@ def mongo_get_network_stats(db, uuid, start, stop, step):
     return {'eth0': {'rx': rx_speed, 'tx': tx_speed}}
 
 
-def mongo_get_stats(uuid, expression, start, stop, step):
+def mongo_get_stats(backend, uuid, expression, start, stop, step):
     """Returns stats for the machine with the given uuid from the mongodb
     backend.
     """
-    connection = Connection(MONGODB['host'], MONGODB['port'])
-    db = connection[MONGODB['dbname']]
+    connection = Connection(backend['host'], backend['port'])
+    db = connection[backend['dbname']]
 
     stats = {}
     for exp in expression:
@@ -536,7 +535,7 @@ def mongo_get_stats(uuid, expression, start, stop, step):
     return stats
 
 
-def graphite_get_stats(uuid, expression, start, stop, step):
+def graphite_get_stats(backend, uuid, expression, start, stop, step):
     """Returns stats from graphite.
 
     .. warning:: I doesn't work, needs rewrite to fit the client API

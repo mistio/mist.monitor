@@ -9,6 +9,13 @@ log = getLogger('mist.monitor')
 
 
 def main(global_config, **settings):
+
+    # Import settings from settings.py
+    user_config = {}
+    execfile(global_config['here'] + '/settings.py', user_config)
+
+    settings['backend'] = user_config['BACKEND']
+
     config = Configurator(root_factory=Root, settings=settings)
     config.scan()
 

@@ -21,3 +21,4 @@ src/carbon/
 src/ceres/
 src/graphite-web/
 src/whisper/
+settings.py

@@ -1,0 +1,34 @@
+"""Configure which monitoring backend to use to get stats from
+
+3 possible options: mongo, graphite and dummy. Only mongo works right now.
+
+Mongo example::
+
+    BACKEND = {
+        'type': 'mongodb',
+        'host': 'localhost',
+        'port': 27022,
+        'dbname': 'collectd'
+    }
+
+Graphite example::
+
+    BACKEND = {
+        'type': 'graphite',
+        'host': 'experiment.unweb.me',
+        'port': 8080
+    }
+
+Dummy example::
+
+    BACKEND = {
+        'type': 'dummy'
+    }
+"""
+
+BACKEND = {
+    'type': 'mongodb',
+    'host': 'localhost',
+    'port': 27022,
+    'dbname': 'collectd'
+}
