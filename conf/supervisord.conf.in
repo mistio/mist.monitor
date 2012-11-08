@@ -38,18 +38,17 @@ directory = ${buildout:directory}/parts/collectd/sbin
 priority = 20
 redirect_stderr = false
 
-
 [program:mongodb]
 command = ${buildout:directory}/bin/start_master.sh #mongod --dbpath ${buildout:directory}/var/data --master --directoryperdb
 process_name = mongodb
 directory = ${buildout:directory}/bin
-priority = 40
+priority = 30
 redirect_stderr = false
 
 [program:graphite]
 command = ${buildout:directory}/bin/graphite runserver --settings=graphite.settings
 process_name = graphite
 directory = ${buildout:directory}/bin
-priority = 50
+priority = 40
 redirect_stderr = false
 
