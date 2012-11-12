@@ -20,7 +20,7 @@ def list_machines(request):
     """Lists all machines with activated monitoring, for this mist.monitor
     instance.
     """
-    file = open(os.getcwd()+'/conf/collectd.passwd')
+    file = open(os.getcwd()+'../conf/collectd.passwd')
     machines = file.read().split('\n')
 
     return machines
