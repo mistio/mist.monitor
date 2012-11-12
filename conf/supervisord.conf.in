@@ -27,7 +27,7 @@ supervisor.rpcinterface_factory=supervisor.rpcinterface:make_main_rpcinterface
 [program:gunicorn]
 command = ${buildout:directory}/bin/gunicorn_paster ${buildout:directory}/production.ini
 process_name = gunicorn
-directory = ${buildout:directory}/bin
+directory = ${buildout:directory}
 priority = 10
 redirect_stderr = false
 
