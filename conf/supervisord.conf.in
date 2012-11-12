@@ -39,7 +39,7 @@ priority = 20
 redirect_stderr = false
 
 [program:mongodb]
-command = ${buildout:directory}/bin/start_master.sh #mongod --dbpath ${buildout:directory}/var/data --master --directoryperdb
+command = ${buildout:directory}/bin/start_master.sh
 process_name = mongodb
 directory = ${buildout:directory}/bin
 priority = 30
