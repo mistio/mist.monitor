@@ -620,17 +620,17 @@ def dummy_get_stats(expression, start, stop, step):
     """
     nr_asked = int((stop - start) / step)
 
-    cpu_cores = numpy.random.randint(0, 10)
+    cpu_cores = numpy.random.randint(1, 2)
     cpu_util = list(numpy.random.rand(nr_asked) * cpu_cores)
 
     load = list(numpy.random.rand(nr_asked))
 
-    memory_total = numpy.random.randint(128000000, 128000000 * 10)
+    memory_total = numpy.random.randint(12800, 12800* 100)
     memory_used = numpy.random.rand(nr_asked) * memory_total
     memory_used = list(memory_used)
 
-    network_rx = list(numpy.random.rand(nr_asked) * 1000)
-    network_tx = list(numpy.random.rand(nr_asked) * 1000)
+    network_rx = list(numpy.random.rand(nr_asked) * 50)
+    network_tx = list(numpy.random.rand(nr_asked) * 50)
 
     stats = {
         'cpu': {
@@ -641,6 +641,25 @@ def dummy_get_stats(expression, start, stop, step):
         'memory': {
             'used': memory_used,
             'total': memory_total
+        },
+       'disk': {
+             'disks': 1,
+             'read': {
+                 'xvda1': {
+                     'disk_merged': [10, 10],
+                     'disk_octets': [117811200, 117811200],
+                     'disk_ops': [11228, 11228],
+                     'disk_time': [345, 345]
+                 }
+             },
+             'write': {
+                 'xvda1': {
+                     'disk_merged': [69292, 69291],
+                     'disk_octets': [1218277376, 1218248704],
+                     'disk_ops': [135415, 135409],
+                     'disk_time': [153624, 153620]
+                 }
+             },
         },
         'network': {
             'eth0': {
