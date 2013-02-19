@@ -173,7 +173,7 @@ def get_stats(request):
         stats = mongo_get_stats(backend, uuid, expression, start, stop, step)
     elif backend['type'] == 'graphite':
         stats = graphite_get_stats(backend, uuid, expression, start, stop, step)
-    elif backend == 'dummy':
+    elif backend['type'] == 'dummy':
         stats = dummy_get_stats(expression, start, stop, step)
     else:
         log.error('Requested invalid monitoring backend: %s' % backend)
