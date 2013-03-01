@@ -14,6 +14,7 @@ LoadPlugin logfile
 </Plugin>
 
 LoadPlugin network
+LoadPlugin write_graphite
 <LoadPlugin perl>
 	Globals true
 </LoadPlugin>
@@ -40,39 +41,26 @@ LoadPlugin write_mongodb
 	CacheFlush 1800
 </Plugin>
 
-<Plugin "perl">
-  BaseName "Collectd::Plugins"
-  LoadPlugin "Graphite"
-
-    <Plugin "Graphite">
-      Buffer "256000"
-      Prefix "servers"
-      Host   "monit.mist.io"
-      Port   "2003"
-    </Plugin>
+#<Plugin write_mongodb>
+#	<Node "local">
+#		Host "127.0.0.1"
+#		Port "27022"
+#		Timeout 1000
+#		StoreRates false
+#	</Node>
+#</Plugin>
+<Plugin write_graphite>
+  <Carbon>
+    Host "nepho3.mist.io"
+    Port "2003"
+    Prefix "mist-"
+    Postfix ""
+    StoreRates false
+    AlwaysAppendDS false
+    EscapeCharacter "_"
+  </Carbon>
 </Plugin>
 
-<Plugin "perl">
-  BaseName "Collectd::Plugins"
-  LoadPlugin "Graphite"
-
-    <Plugin "Graphite">
-      Buffer "256000"
-      Prefix "servers"
-      Host   "experiment.unweb.me"
-      Port   "2003"
-    </Plugin>
-</Plugin>
-
-
-<Plugin write_mongodb>
-	<Node "local">
-		Host "127.0.0.1"
-		Port "27022"
-		Timeout 1000
-		StoreRates false
-	</Node>
-</Plugin>
 
 Include "collectd.conf.local"
 

@@ -22,6 +22,8 @@ from logging import getLogger
 from pymongo import Connection
 from pymongo import DESCENDING
 
+import requests
+
 
 log = getLogger('mist.monitor')
 
@@ -535,82 +537,62 @@ def mongo_get_stats(backend, uuid, expression, start, stop, step):
     return stats
 
 
-def graphite_get_stats(backend, uuid, expression, start, stop, step):
+def graphite_get_stats(uuid, expression, start, stop, step):
     """Returns stats from graphite.
-
-    .. warning:: I doesn't work, needs rewrite to fit the client API
+       placeholder!
     """
-
-    """
-    #FIXME: default targets -- could be user customizable
     targets = ["cpu", "load", "memory", "disk"]
 
-    # get request params
-    try:
-        uuid = request.matchdict['machine']
-
-        # check for errors
-        if not uuid:
-            log.error("cannot find uuid %s" % uuid)
-            raise
-    except Exception as e:
-        return Response('Bad Request', 400)
-
-
-    changes_since = request.params.get('changes_since', None)
-    if not changes_since:
-        changes_since = "-1hours&"
-    else:
-        changes_since = "%d" %(int(float(changes_since)/1000))
-
-    data_format = request.params.get('format', None)
-    if not data_format:
-        data_format = "format=json&"
-
-    #FIXME: get rid of that, we are already on the monitoring server,
-    #we should know better ;-)
-    graphite_uri = "http://experiment.unweb.me:8080"
-
+    data_format = "json"
+    graphite_uri = "http://nepho3.mist.io:80"
     data = {'cpu': [ ], 'load':  [ ], 'memory': [ ], 'disk': [ ] }
-    interval = 1000
 
-    for target in targets:
-        target_uri = "target=servers." + uuid + "." + target + "*.*.*&"
-        time_range = "from=%s&until=now" %(changes_since)
-        #construct uri
-        uri = graphite_uri + "/render?" + data_format + target_uri + time_range
-        print uri
+    vm_hostname = "mist-%s" %(uuid)
+    
+    
+    total_wo_idle_sum = 'sumSeries(exclude(' + vm_hostname + '.cpu-0.*,"idle"))'
+    total_sum = 'sumSeries(' + vm_hostname + '.cpu-0.*)'
+    
+    first_set = 'derivative(' + total_wo_idle_sum + ')'
+    second_set = 'derivative(' + total_sum + ')'
+    
+    build_target = "divideSeries(" + first_set + "," + second_set + ")"
+    
+    target = build_target
+    
+    #FIXME: at the moment, graphite does not return enough values for D3, so
+    #we ask for all and truncate the reply to the nr_asked value
+    #time = "&from=%d&to=%d" %(start - 10*step,stop)
+    time = ""
+    
+    build_uri = graphite_uri + "/render?" + "target=" + target + time + "&format=" + data_format
+    
+    print build_uri
+    
+    try:
+        r = requests.get(build_uri, params=None)
+    except:
+        return Response("Internal Error", 500)
+    
+    data = r.json()[0]['datapoints']
+    howmany = len(data)
+    real_list_data = []
+    #print "no of data returned from graphite: %d" %(howmany)
+    for x in range(0, howmany):
+        if data[x][0] == None:
+            data[x][0] = 0
+        real_list_data.append(data[x][0])
+    nr_asked = int((stop - start) / step)
+    real_list_data = real_list_data[-nr_asked:]
+    real_data = {'utilization': real_list_data, 'cores':1}
 
-        r = requests.get(uri)
-        if r.status_code == 200:
-            log.info("connect OK")
-        else:
-            log.error("Status code = %d" %(r.status_code))
 
-        if not len(r.json):
-            continue
+    #FIXME: get dummy stats and populate the CPU from the real thing ;-)
+    ret = dummy_get_stats(expression, start, stop, step)
+    #inject real data into the dummy return response
+    ret['cpu'] = real_data
 
-        for i in range (0, len(r.json[0]['datapoints'])):
-            value = r.json[0]['datapoints'][i][0]
-            if value:
-                data[target].append(r.json[0]['datapoints'][i][0])
-            else:
-                data[target].append(1)
-
-    #timestamp = r.json[0]['datapoints'][0][1] * 1000
-    timestamp = time() * 1000
-
-    ret = {'timestamp': timestamp,
-           'interval': interval,
-           'cpu': data['cpu'],
-           'load': data['load'],
-           'memory': data['memory'],
-           'disk': data['disk']}
-
-    log.info(ret)
     return ret
-    """
-    return {}
 
 
 def dummy_get_stats(expression, start, stop, step):
