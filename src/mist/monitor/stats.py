@@ -562,8 +562,9 @@ def graphite_get_stats(uuid, expression, start, stop, step):
     
     #FIXME: at the moment, graphite does not return enough values for D3, so
     #we ask for all and truncate the reply to the nr_asked value
-    #time = "&from=%d&to=%d" %(start - 10*step,stop)
-    time = ""
+    time = "&from=%d&until=%d" %(start - 2*step,stop)
+    #print time
+    #time = ""
     
     build_uri = graphite_uri + "/render?" + "target=" + target + time + "&format=" + data_format
     
@@ -572,8 +573,13 @@ def graphite_get_stats(uuid, expression, start, stop, step):
     try:
         r = requests.get(build_uri, params=None)
     except:
+        log.warn("Could not get data from graphite")
         return Response("Internal Error", 500)
     
+    if r.status_code != 200:
+        log.warn("Got response different than 200")
+        return Response("Unknown Error", 500)
+
     data = r.json()[0]['datapoints']
     howmany = len(data)
     real_list_data = []
@@ -586,11 +592,69 @@ def graphite_get_stats(uuid, expression, start, stop, step):
     real_list_data = real_list_data[-nr_asked:]
     real_data = {'utilization': real_list_data, 'cores':1}
 
+    print real_data
 
+    target = 'scale(derivative(' + vm_hostname + '.interface-eth0.if_octets.tx), 0.00012207031250000000)'
+#    target = 'scale(derivative(' + vm_hostname + '.interface-eth0.if_octets.tx), 1)'
+    build_uri = graphite_uri + "/render?" + "target=" + target + time + "&format=" + data_format
+    
+    print build_uri
+
+    try:
+        r = requests.get(build_uri, params=None)
+    except:
+        log.warn("Could not get data from graphite")
+        return Response("Internal Error", 500)
+    
+    if r.status_code != 200:
+        log.warn("Got response different than 200")
+        return Response("Unknown Error", 500)
+
+    data = r.json()[0]['datapoints']
+    howmany = len(data)
+    real_tx_data = []
+    #print "no of data returned from graphite: %d" %(howmany)
+    for x in range(0, howmany):
+        if data[x][0] == None:
+            data[x][0] = 0
+        real_tx_data.append(data[x][0])
+    nr_asked = int((stop - start) / step)
+    real_tx_data = real_tx_data[-nr_asked:]
+
+    target = 'scale(derivative(' + vm_hostname + '.interface-eth0.if_octets.rx), 0.00012207031250000000)'
+#    target = 'scale(derivative(' + vm_hostname + '.interface-eth0.if_octets.rx), 1)'
+    build_uri = graphite_uri + "/render?" + "target=" + target + time + "&format=" + data_format
+    
+    print build_uri
+
+    try:
+        r = requests.get(build_uri, params=None)
+    except:
+        log.warn("Could not get data from graphite")
+        return Response("Internal Error", 500)
+    
+    if r.status_code != 200:
+        log.warn("Got response different than 200")
+        return Response("Unknown Error", 500)
+
+    data = r.json()[0]['datapoints']
+    howmany = len(data)
+    real_rx_data = []
+    #print "no of data returned from graphite: %d" %(howmany)
+    for x in range(0, howmany):
+        if data[x][0] == None:
+            data[x][0] = 0
+        real_rx_data.append(data[x][0])
+    nr_asked = int((stop - start) / step)
+    real_rx_data = real_rx_data[-nr_asked:]
+    real_net_data = {'eth0':  { 'rx': real_rx_data, 'tx': real_tx_data } }
+
+    print real_net_data
     #FIXME: get dummy stats and populate the CPU from the real thing ;-)
     ret = dummy_get_stats(expression, start, stop, step)
     #inject real data into the dummy return response
     ret['cpu'] = real_data
+    ret['network'] = real_net_data
 
     return ret
 
