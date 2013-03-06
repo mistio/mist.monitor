@@ -742,10 +742,12 @@ def graphite_get_disk_stats(uri, uuid, time):
     vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
 
     #FIXME: minimize graphite queries -- This is unacceptable!
-    disk_types = ['disk_merged', 'disk_octets', 'disk_ops', 'disk_time' ]
+    #commenting out the other values -- not sure we actually need them
+    #disk_types = ['disk_merged', 'disk_octets', 'disk_ops', 'disk_time' ]
+    disk_types = ['disk_octets']
     for disk_type in disk_types:
         
-        target = 'sumSeries(%s.disk-*.%s.read)' % (vm_hostname, disk_type)
+        target = 'derivative(sumSeries(%s.disk-*.%s.read))' % (vm_hostname, disk_type)
         
         complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
     
@@ -759,7 +761,7 @@ def graphite_get_disk_stats(uri, uuid, time):
     
     for disk_type in disk_types:
         
-        target = 'sumSeries(%s.disk-*.%s.write)' % (vm_hostname, disk_type)
+        target = 'derivative(sumSeries(%s.disk-*.%s.write))' % (vm_hostname, disk_type)
         
         complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
     
