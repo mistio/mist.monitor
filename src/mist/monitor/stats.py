@@ -14,6 +14,8 @@ return is the following:
 from datetime import datetime
 from time import time
 
+from pyramid.response import Response
+
 import numpy
 from scipy import interpolate
 
@@ -545,18 +547,22 @@ def graphite_issue_request(uri):
     ret = []
     if not uri:
         log.warn("You have to specify the backend's URI")
-        return ret
+        return Response("Bad Request", 400)
 
     try:
         req = requests.get(uri, params=None)
     except:
         log.warn("Could not get data from graphite")
-        return Response("Internal Error", 500)
+        return Response("Service Unavailable", 503)
     
     if req.status_code != 200:
         log.warn("Got response different than 200")
-        return Response("Unknown Error", 500)
+        return Response("", req.status_code)
 
+    json_len = len(req.json())
+    if not json_len:
+        log.debug("json length is %d, request_uri = %s" % (json_len, uri))
+        return ret
     data = req.json()[0]['datapoints']
     data_len = len(data)
     real_list_data = []
@@ -690,6 +696,7 @@ def graphite_get_mem_stats(uri, uuid, time):
 
     if not list_data:
         log.warn("MEM data empty :S")
+        return mem_data
 
     mem_data['total'] = list_data[0]
 
@@ -748,6 +755,7 @@ def graphite_get_disk_stats(uri, uuid, time):
     
         if not list_data:
             log.warn("DISK data empty :S")
+            return disk_data
     
     for disk_type in disk_types:
         
@@ -772,13 +780,7 @@ def graphite_get_stats(host, port, uuid, expression, start, stop, step):
 
     uri = "http://%s:%d" %(host, port)
 
-    time = "&from=%s&until=%s" % (start - 2*step, stop)
-    #cpu_data = graphite_get_cpu_stats(uri, uuid, time)
-
-    #net_data = graphite_get_net_stats(uri, uuid, time)
-
-    #real_data= {'cpu': cpu_data, 'load':  [], 'network': net_data, 'memory': {}, 'disk': {} }
-
+    time = "&from=%s&until=%s" % (start, stop)
     #FIXME: get dummy stats and populate the CPU from the real thing ;-)
     ret = dummy_get_stats(expression, start, stop, step)
     #inject real data into the dummy return response
@@ -790,6 +792,7 @@ def graphite_get_stats(host, port, uuid, expression, start, stop, step):
     load_data = graphite_get_load_stats(uri, uuid, time)
 
     mem_data = graphite_get_mem_stats(uri, uuid, time)
+
     disk_data = graphite_get_disk_stats(uri, uuid, time)
 
     ret['cpu'] = cpu_data
