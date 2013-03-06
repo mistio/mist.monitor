@@ -183,4 +183,6 @@ def get_stats(request):
         log.error('Requested invalid monitoring backend: %s' % backend)
         return Response('Service unavailable', 503)
 
+    log.debug("uuid = %s, expression = %s, start = %d, stop = %d, step = %d" % (uuid, expression, start, stop, step))
+    log.debug(stats)
     return stats
