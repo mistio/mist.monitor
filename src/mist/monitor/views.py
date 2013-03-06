@@ -31,20 +31,21 @@ def add_machine(request):
     """Adds machine to monitored list."""
     uuid = request.params.get('uuid', None)
     passwd = request.params.get('passwd', None)
+    log.debug("Adding machine %s to monitor list" % (uuid))
 
     if not uuid or not passwd:
         return Response('Unauthorized', 401)
 
     # check if uuid already in pass file
     try:
-        f = open("conf/collectd.passwd")
+        f = open(os.getcwd()+"/conf/collectd.passwd")
         res = f.read()
         f.close()
         if uuid in res:
             return Response('Conflict', 409)
 
         # append collectd pw file
-        f = open("conf/collectd.passwd", 'a')
+        f = open(os.getcwd()+"/conf/collectd.passwd", 'a')
         f.writelines(['\n'+ uuid + ': ' + passwd])
         f.close()
     except Exception as e:
@@ -52,8 +53,7 @@ def add_machine(request):
         return Response('Service unavailable', 503)
 
     # create new collectd conf section for allowing machine stats
-    config_append = """
-        PreCacheChain "%sRule"
+    config_append = """PreCacheChain "%sRule"
         <Chain "%sRule">
             <Rule "rule">
                 <Match "regex">
@@ -62,16 +62,17 @@ def add_machine(request):
                 Target return
             </Rule>
             Target stop
-        </Chain>""" % (uuid, uuid, uuid)
+        </Chain>
+        """ % (uuid, uuid, uuid)
 
     try:
-        f = open("conf/collectd_%s.conf"%uuid,"w")
+        f = open(os.getcwd()+"/conf/collectd_%s.conf"%uuid,"w")
         f.write(config_append)
         f.close()
 
         # include the new file in the main config
-        config_include = "conf/collectd_%s.conf" % uuid
-        f = open("conf/collectd.conf.local", "a")
+        config_include = os.getcwd()+"/conf/collectd_%s.conf" % uuid
+        f = open(os.getcwd()+"/conf/collectd.conf.local", "a")
         f.write('\nInclude "%s"\n'% config_include)
         f.close()
     except Exception as e:
@@ -90,12 +91,13 @@ def add_machine(request):
 def remove_machine(request):
     """Removes machine from monitored list."""
     uuid = request.matchdict['machine']
+    log.debug("Removing machine %s from monitor list" % (uuid))
 
     if not uuid:
         return Response('Bad Request', 400)
 
     try:
-        f = open("conf/collectd.passwd")
+        f = open(os.getcwd()+"/conf/collectd.passwd")
         res = f.read()
         f.close()
         if uuid not in res:
@@ -105,7 +107,7 @@ def remove_machine(request):
             if uuid in l:
                 lines.remove(l)
         res = '\n' .join(lines)
-        f = open("conf/collectd.passwd",'w')
+        f = open(os.getcwd()+"/conf/collectd.passwd",'w')
         f.write(res)
         f.close()
     except Exception as e:
@@ -113,7 +115,7 @@ def remove_machine(request):
         return Response('Service unavailable', 503)
 
     try:
-        f = open("conf/collectd.conf.local")
+        f = open(os.getcwd()+"/conf/collectd.conf.local")
         res = f.read()
         f.close()
         if uuid not in res:
@@ -123,7 +125,7 @@ def remove_machine(request):
             if uuid in l:
                 lines.remove(l)
         res = '\n' .join(lines)
-        f = open("conf/collectd.conf.local",'w')
+        f = open(os.getcwd()+"/conf/collectd.conf.local",'w')
         f.write(res)
         f.close()
     except Exception as e:
