@@ -172,7 +172,9 @@ def get_stats(request):
     if backend['type'] == 'mongodb':
         stats = mongo_get_stats(backend, uuid, expression, start, stop, step)
     elif backend['type'] == 'graphite':
-        stats = graphite_get_stats(uuid, expression, start, stop, step)
+        host = backend['host']
+        port = backend['port']
+        stats = graphite_get_stats(host, port, uuid, expression, start, stop, step)
     elif backend['type'] == 'dummy':
         stats = dummy_get_stats(expression, start, stop, step)
     else:

@@ -24,6 +24,7 @@ from pymongo import DESCENDING
 
 import requests
 
+MACHINE_PREFIX = "mist"
 
 log = getLogger('mist.monitor')
 
@@ -537,124 +538,265 @@ def mongo_get_stats(backend, uuid, expression, start, stop, step):
     return stats
 
 
-def graphite_get_stats(uuid, expression, start, stop, step):
-    """Returns stats from graphite.
-       placeholder!
+def graphite_issue_request(uri):
+    """ gets data from graphite
     """
-    targets = ["cpu", "load", "memory", "disk"]
 
-    data_format = "json"
-    graphite_uri = "http://nepho3.mist.io:80"
-    data = {'cpu': [ ], 'load':  [ ], 'memory': [ ], 'disk': [ ] }
+    ret = []
+    if not uri:
+        log.warn("You have to specify the backend's URI")
+        return ret
 
-    vm_hostname = "mist-%s" %(uuid)
-    
-    
-    total_wo_idle_sum = 'sumSeries(exclude(' + vm_hostname + '.cpu-0.*,"idle"))'
-    total_sum = 'sumSeries(' + vm_hostname + '.cpu-0.*)'
-    
-    first_set = 'derivative(' + total_wo_idle_sum + ')'
-    second_set = 'derivative(' + total_sum + ')'
-    
-    build_target = "divideSeries(" + first_set + "," + second_set + ")"
-    
-    target = build_target
-    
-    #FIXME: at the moment, graphite does not return enough values for D3, so
-    #we ask for all and truncate the reply to the nr_asked value
-    time = "&from=%d&until=%d" %(start - 2*step,stop)
-    #print time
-    #time = ""
-    
-    build_uri = graphite_uri + "/render?" + "target=" + target + time + "&format=" + data_format
-    
-    print build_uri
-    
     try:
-        r = requests.get(build_uri, params=None)
+        req = requests.get(uri, params=None)
     except:
         log.warn("Could not get data from graphite")
         return Response("Internal Error", 500)
     
-    if r.status_code != 200:
+    if req.status_code != 200:
         log.warn("Got response different than 200")
         return Response("Unknown Error", 500)
 
-    data = r.json()[0]['datapoints']
-    howmany = len(data)
+    data = req.json()[0]['datapoints']
+    data_len = len(data)
     real_list_data = []
-    #print "no of data returned from graphite: %d" %(howmany)
-    for x in range(0, howmany):
+    #print "no of data returned from graphite: %d" %(data_len)
+    for x in range(0, data_len):
+        #FIXME: is this correct? if graphite returned None, it means that there is
+        # no value for this specific timestamp. If we set it to 0 the user could
+        # misinterpret this value ...
         if data[x][0] == None:
             data[x][0] = 0
         real_list_data.append(data[x][0])
-    nr_asked = int((stop - start) / step)
-    real_list_data = real_list_data[-nr_asked:]
-    real_data = {'utilization': real_list_data, 'cores':1}
 
-    print real_data
+    ret = real_list_data
 
-    target = 'scale(derivative(' + vm_hostname + '.interface-eth0.if_octets.tx), 0.00012207031250000000)'
-#    target = 'scale(derivative(' + vm_hostname + '.interface-eth0.if_octets.tx), 1)'
-    build_uri = graphite_uri + "/render?" + "target=" + target + time + "&format=" + data_format
+    return ret
+
+
+def graphite_get_cpu_stats(uri, uuid, time):
+    """ gets CPU data for a given uuid
+    """
+
+    #FIXME: curently aggregates utilization for all CPUs -- thus we pass 1 to D3
+    cpu_data = { 'utilization': [], 'cores': 1 }
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
     
-    print build_uri
+    #Calculate the sum of all time measurements, excluding the "idle" one
+    total_wo_idle_sum = 'sumSeries(exclude(%s.cpu-0.*,"idle"))' % (vm_hostname)
 
-    try:
-        r = requests.get(build_uri, params=None)
-    except:
-        log.warn("Could not get data from graphite")
-        return Response("Internal Error", 500)
+    total_sum = 'sumSeries(%s.cpu-0.*)' % (vm_hostname)
     
-    if r.status_code != 200:
-        log.warn("Got response different than 200")
-        return Response("Unknown Error", 500)
-
-    data = r.json()[0]['datapoints']
-    howmany = len(data)
-    real_tx_data = []
-    #print "no of data returned from graphite: %d" %(howmany)
-    for x in range(0, howmany):
-        if data[x][0] == None:
-            data[x][0] = 0
-        real_tx_data.append(data[x][0])
-    nr_asked = int((stop - start) / step)
-    real_tx_data = real_tx_data[-nr_asked:]
-
-    target = 'scale(derivative(' + vm_hostname + '.interface-eth0.if_octets.rx), 0.00012207031250000000)'
-#    target = 'scale(derivative(' + vm_hostname + '.interface-eth0.if_octets.rx), 1)'
-    build_uri = graphite_uri + "/render?" + "target=" + target + time + "&format=" + data_format
+    #Calculate the derivative of each sum
+    first_set = 'derivative(%s)' % (total_wo_idle_sum)
+    second_set = 'derivative(%s)' % (total_sum)
     
-    print build_uri
-
-    try:
-        r = requests.get(build_uri, params=None)
-    except:
-        log.warn("Could not get data from graphite")
-        return Response("Internal Error", 500)
+    #Divide the first with the second sum (wo_idle_sum / total_sum)
+    target = "divideSeries(%s,%s)" % (first_set, second_set)
     
-    if r.status_code != 200:
-        log.warn("Got response different than 200")
-        return Response("Unknown Error", 500)
+    complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
 
-    data = r.json()[0]['datapoints']
-    howmany = len(data)
-    real_rx_data = []
-    #print "no of data returned from graphite: %d" %(howmany)
-    for x in range(0, howmany):
-        if data[x][0] == None:
-            data[x][0] = 0
-        real_rx_data.append(data[x][0])
-    nr_asked = int((stop - start) / step)
-    real_rx_data = real_rx_data[-nr_asked:]
-    real_net_data = {'eth0':  { 'rx': real_rx_data, 'tx': real_tx_data } }
+    list_data = graphite_issue_request(complete_uri)
 
-    print real_net_data
+    cpu_data['utilization'] = list_data
+
+    if not list_data:
+        log.warn("cpu utilization data empty :S")
+
+    ret = cpu_data
+
+    return ret
+
+
+def graphite_get_net_stats(uri, uuid, time):
+    """
+    """
+
+    #FIXME: curently works for a single interface
+    net_data = { 'eth0': { 'rx': [], 'tx': []} }
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+    
+    #FIXME: we may want to return KB instead of just bytes -- if we do, we have to 
+    #scale to 1/1024
+    #FIXME: find a way to handle rx and tx at the same time. Maybe we could get graphite 
+    #to return a dict with 2 lists, 'tx' and 'rx'.
+    #target = 'scale(derivative(%s.interface-eth0.if_octets.tx), 0.00012207031250000000)'
+    target = 'derivative(%s.interface-eth0.if_octets.tx)' % (vm_hostname)
+    
+    complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
+
+    list_data = graphite_issue_request(complete_uri)
+
+    net_data['eth0']['tx'] = list_data
+
+    if not list_data:
+        log.warn("NET TX data empty :S")
+
+    target = 'derivative(%s.interface-eth0.if_octets.rx)' % (vm_hostname)
+    
+    complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
+
+    list_data = graphite_issue_request(complete_uri)
+
+    net_data['eth0']['rx'] = list_data
+
+    if not list_data:
+        log.warn("NET RX data empty :S")
+
+    ret = net_data
+    return ret
+
+
+def graphite_get_load_stats(uri, uuid, time):
+    """
+    """
+
+    load_data = []
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+    
+    target = '%s.load.load.shortterm' % (vm_hostname)
+    
+    complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
+
+    list_data = graphite_issue_request(complete_uri)
+
+    load_data = list_data
+
+    if not list_data:
+        log.warn("LOAD data empty :S")
+
+    ret = load_data
+    return ret
+
+
+def graphite_get_mem_stats(uri, uuid, time):
+    """
+    """
+
+    mem_data = {'total': 0, 'used': [] }
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+
+    #FIXME: find a way to calculate the total memory without querying graphite!
+    
+    target = 'scale(sumSeries(%s.memory.memory-*),0.00097656250000000000)' % (vm_hostname)
+    
+    complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
+
+    list_data = graphite_issue_request(complete_uri)
+
+    if not list_data:
+        log.warn("MEM data empty :S")
+
+    mem_data['total'] = list_data[0]
+
+    target = 'scale(sumSeries(%s.memory.memory-{buffered,cached,used}),0.00097656250000000000)' % (vm_hostname)
+    
+    complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
+
+    list_data = graphite_issue_request(complete_uri)
+
+    mem_data['used'] = list_data
+
+    if not list_data:
+        log.warn("MEM data empty :S")
+
+    ret = mem_data
+    return ret
+
+
+def graphite_get_disk_stats(uri, uuid, time):
+    """
+    """
+
+    disk_data = {
+             'disks': 1,
+             'read': {
+                 'xvda1': {
+                     'disk_merged': [],
+                     'disk_octets': [],
+                     'disk_ops': [],
+                     'disk_time': []
+                 }
+             },
+             'write': {
+                 'xvda1': {
+                     'disk_merged': [],
+                     'disk_octets': [],
+                     'disk_ops': [],
+                     'disk_time': []
+                 }
+             },
+        }
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+
+    #FIXME: minimize graphite queries -- This is unacceptable!
+    disk_types = ['disk_merged', 'disk_octets', 'disk_ops', 'disk_time' ]
+    for disk_type in disk_types:
+        
+        target = 'sumSeries(%s.disk-*.%s.read)' % (vm_hostname, disk_type)
+        
+        complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
+    
+        list_data = graphite_issue_request(complete_uri)
+    
+        disk_data['read']['xvda1'][disk_type] = list_data
+    
+        if not list_data:
+            log.warn("DISK data empty :S")
+    
+    for disk_type in disk_types:
+        
+        target = 'sumSeries(%s.disk-*.%s.write)' % (vm_hostname, disk_type)
+        
+        complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
+    
+        list_data = graphite_issue_request(complete_uri)
+    
+        disk_data['write']['xvda1'][disk_type] = list_data
+    
+        if not list_data:
+            log.warn("DISK data empty :S")
+    
+    ret = disk_data
+    return ret
+
+
+def graphite_get_stats(host, port, uuid, expression, start, stop, step):
+    """Returns stats from graphite.
+    """
+
+    uri = "http://%s:%d" %(host, port)
+
+    time = "&from=%s&until=%s" % (start - 2*step, stop)
+    #cpu_data = graphite_get_cpu_stats(uri, uuid, time)
+
+    #net_data = graphite_get_net_stats(uri, uuid, time)
+
+    #real_data= {'cpu': cpu_data, 'load':  [], 'network': net_data, 'memory': {}, 'disk': {} }
+
     #FIXME: get dummy stats and populate the CPU from the real thing ;-)
     ret = dummy_get_stats(expression, start, stop, step)
     #inject real data into the dummy return response
-    ret['cpu'] = real_data
-    ret['network'] = real_net_data
+
+    cpu_data = graphite_get_cpu_stats(uri, uuid, time)
+
+    net_data = graphite_get_net_stats(uri, uuid, time)
+
+    load_data = graphite_get_load_stats(uri, uuid, time)
+
+    mem_data = graphite_get_mem_stats(uri, uuid, time)
+    disk_data = graphite_get_disk_stats(uri, uuid, time)
+
+    ret['cpu'] = cpu_data
+    ret['network'] = net_data
+    ret['load'] = load_data
+    ret['memory'] = mem_data
+    ret['disk'] = disk_data
 
     return ret
 
