@@ -744,7 +744,7 @@ def graphite_get_disk_stats(uri, uuid, time):
     #FIXME: minimize graphite queries -- This is unacceptable!
     #commenting out the other values -- not sure we actually need them
     #disk_types = ['disk_merged', 'disk_octets', 'disk_ops', 'disk_time' ]
-    disk_types = ['disk_octets']
+    disk_types = ['disk_ops']
     for disk_type in disk_types:
         
         target = 'derivative(sumSeries(%s.disk-*.%s.read))' % (vm_hostname, disk_type)
