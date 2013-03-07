@@ -44,12 +44,17 @@ def add_machine(request):
         if uuid in res:
             return Response('Conflict', 409)
 
+    except Exception as e:
+        log.warn('Error opening machines pw file: %s' % e)
+        log.warn('Maybe it is our first time here, so we touch the file')
+
+    try:
         # append collectd pw file
         f = open(os.getcwd()+"/conf/collectd.passwd", 'a')
         f.writelines(['\n'+ uuid + ': ' + passwd])
         f.close()
     except Exception as e:
-        log.error('Error opening machines pw file: %s' % e)
+        log.warn('Error creating machines pw file: %s' % e)
         return Response('Service unavailable', 503)
 
     # create new collectd conf section for allowing machine stats
