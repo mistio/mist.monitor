@@ -66,7 +66,7 @@ def add_machine(request):
                 </Match>
                 Target return
             </Rule>
-            Target stop
+            Target continue
         </Chain>
         """ % (uuid, uuid, uuid)
 
