@@ -547,17 +547,17 @@ def graphite_issue_request(uri):
     ret = []
     if not uri:
         log.warn("You have to specify the backend's URI")
-        return Response("Bad Request", 400)
+        return ret
 
     try:
         req = requests.get(uri, params=None)
     except:
         log.warn("Could not get data from graphite")
-        return Response("Service Unavailable", 503)
+        return ret
     
     if req.status_code != 200:
         log.warn("Got response different than 200")
-        return Response("", req.status_code)
+        return ret
 
     json_len = len(req.json())
     if not json_len:
@@ -576,6 +576,9 @@ def graphite_issue_request(uri):
         real_list_data.append(data[x][0])
 
     ret = real_list_data
+    if not ret.__class__ is list:
+        log.error("data is not returned correctly. Need a list, got %s" % ret)
+        ret = []
 
     return ret
 
