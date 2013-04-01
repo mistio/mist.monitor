@@ -16,8 +16,8 @@ from time import time
 
 from pyramid.response import Response
 
-import numpy
-from scipy import interpolate
+#import numpy
+#from scipy import interpolate
 
 from logging import getLogger
 
@@ -787,8 +787,9 @@ def graphite_get_stats(host, port, uuid, expression, start, stop, step):
 
     time = "&from=%s&until=%s" % (start, stop)
     #FIXME: get dummy stats and populate the CPU from the real thing ;-)
-    ret = dummy_get_stats(expression, start, stop, step)
+    #ret = dummy_get_stats(expression, start, stop, step)
     #inject real data into the dummy return response
+    ret = {}
 
     cpu_data = graphite_get_cpu_stats(uri, uuid, time)
 
