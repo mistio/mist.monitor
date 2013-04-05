@@ -24,9 +24,9 @@ password =
 [rpcinterface:supervisor]
 supervisor.rpcinterface_factory=supervisor.rpcinterface:make_main_rpcinterface
 
-[program:gunicorn]
-command = ${buildout:directory}/bin/gunicorn_paster ${buildout:directory}/production.ini
-process_name = gunicorn
+[program:uwsgi]
+command = ${buildout:directory}/bin/uwsgi --ini-paste ${buildout:directory}/production.ini -x ${buildout:directory}/parts/uwsgi/uwsgi.xml --paste-logger
+process_name = uwsgi
 directory = ${buildout:directory}
 priority = 10
 redirect_stderr = false
