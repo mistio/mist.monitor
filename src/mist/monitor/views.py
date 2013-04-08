@@ -155,15 +155,22 @@ def get_stats(request):
         log.error("cannot find uuid %s" % uuid)
         return Response('Bad Request', 400)
 
+    allowed_expression = ['cpu', 'load', 'memory', 'disk', 'network']
+
     expression = request.params.get('expression',
                                     ['cpu', 'load', 'memory', 'disk', 'network'])
     if expression.__class__ in [str,unicode]:
         #expression = [expression]
         expression = expression.split(',')
 
+    for target in expression:
+        if target not in allowed_expression:
+            log.error("expression error '%s'" % target)
+            return Response('Bad Request', 400)
+
     # step comes from the client in millisecs, convert it to secs
-    step = int(request.params.get('step', 60000))
-    if (step > 1000):
+    step = int(request.params.get('step', 10000))
+    if (step >= 5000):
         step = int(step/1000)
     elif step == 0:
         log.warn("We got step == 0, maybe the client is broken ;S, using default")
@@ -189,5 +196,5 @@ def get_stats(request):
         return Response('Service unavailable', 503)
 
     log.debug("uuid = %s, expression = %s, start = %d, stop = %d, step = %d" % (uuid, expression, start, stop, step))
-    log.debug(stats)
+    #log.debug(stats)
     return stats
