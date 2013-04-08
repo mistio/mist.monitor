@@ -583,6 +583,95 @@ def graphite_issue_request(uri):
     return ret
 
 
+def graphite_build_cpu_target(uuid):
+    """ gets CPU data for a given uuid
+    """
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+    
+    #Calculate the sum of all time measurements, excluding the "idle" one
+    total_wo_idle_sum = 'sumSeries(exclude(%s.cpu-0.*,"idle"))' % (vm_hostname)
+
+    total_sum = 'sumSeries(%s.cpu-0.*)' % (vm_hostname)
+    
+    #Calculate the derivative of each sum
+    first_set = 'derivative(%s)' % (total_wo_idle_sum)
+    second_set = 'derivative(%s)' % (total_sum)
+    
+    #Divide the first with the second sum (wo_idle_sum / total_sum)
+    target = "divideSeries(%s,%s)" % (first_set, second_set)
+    
+    target_uri = "target=alias(%s,'cpu')" % (target) 
+
+    return target_uri 
+
+
+def graphite_build_net_target(uuid):
+    """
+    """
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+    
+    target = 'derivative(%s.interface-eth0.if_octets.tx)' % (vm_hostname)
+    
+    target_uri = "target=alias(%s,'net-send')" % (target) 
+
+    target = 'derivative(%s.interface-eth0.if_octets.rx)' % (vm_hostname)
+
+    target_uri += "&target=alias(%s, 'net-recv')" % (target) 
+
+    return target_uri
+
+
+def graphite_build_load_target(uuid):
+    """
+    """
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+    
+    target = '%s.load.load.shortterm' % (vm_hostname)
+    
+    target_uri = "target=alias(%s,'load')" % (target) 
+
+    return target_uri
+
+
+def graphite_build_mem_target(uuid):
+    """
+    """
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+
+    target = 'scale(sumSeries(%s.memory.memory-*),0.00097656250000000000)' % (vm_hostname)
+    
+    target_uri = "target=alias(%s,'mem-total')" % (target) 
+
+    target = 'scale(sumSeries(%s.memory.memory-{buffered,cached,used}),0.00097656250000000000)' % (vm_hostname)
+    
+    target_uri += "&target=alias(%s,'mem')" % (target) 
+
+    return target_uri
+
+
+def graphite_build_disk_target(uuid):
+    """
+    """
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+
+    #disk_types = ['disk_merged', 'disk_octets', 'disk_ops', 'disk_time' ]
+    disk_type = 'disk_ops'
+    target = 'derivative(sumSeries(%s.disk-*.%s.read))' % (vm_hostname, disk_type)
+        
+    target_uri = "target=alias(%s,'disk-read')" % (target) 
+    
+    target = 'derivative(sumSeries(%s.disk-*.%s.write))' % (vm_hostname, disk_type)
+
+    target_uri += "&target=alias(%s,'disk-write')" % (target) 
+        
+    return target_uri
+
+
 def graphite_get_cpu_stats(uri, uuid, time):
     """ gets CPU data for a given uuid
     """
@@ -779,6 +868,137 @@ def graphite_get_disk_stats(uri, uuid, time):
     return ret
 
 
+def graphite_issue_massive_request(uri, nrstats):
+    """ gets data from graphite
+    """
+
+    ret = []
+    if not uri:
+        log.warn("You have to specify the backend's URI")
+        return ret
+
+    try:
+        req = requests.get(uri, params=None)
+    except:
+        log.warn("Could not get data from graphite")
+        return ret
+    
+    if req.status_code != 200:
+        log.warn("Got response different than 200")
+        return ret
+
+    json_len = len(req.json())
+    if not json_len:
+        log.debug("json length is %d, request_uri = %s" % (json_len, uri))
+        return ret
+    real_list_data = {}
+
+    for i in range(0, json_len):
+        data = req.json()[i]['datapoints']
+        data_len = len(data)
+        index = req.json()[i]['target']
+        real_list_data[index] = []
+        log.warn("%s %d %d" % (index, data_len, nrstats))
+        real_list_data[index] = [j[0] for j in data]
+        #real_list_data[index] = [j[0] if j[0].__class__ in [float,int] else 0.1 for j in data]
+        if (len(real_list_data[index]) > 1):
+            real_list_data[index] = real_list_data[index][1:]
+        else:
+            log.warn("not enough data to skip the first one :S")
+
+    #log.warn(real_list_data)
+    ret = real_list_data
+    #print real_list_data
+#    if not ret.__class__ is list:
+#        log.error("data is not returned correctly. Need a list, got %s" % ret)
+#        ret = []
+
+    return ret
+
+def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
+    """Returns stats from graphite.
+    """
+    switch_stat = {'cpu': graphite_build_cpu_target,
+                   'memory': graphite_build_mem_target,
+                   'load': graphite_build_load_target,
+                   'network': graphite_build_net_target,
+                   'disk': graphite_build_disk_target 
+                  }
+
+    uri = "http://%s:%d" %(host, port)
+
+    #FIXME: we ask for one more number in order to skip the first one returned.
+    #In the case of derivatives we get None and D3 chokes on this. 
+    time = "&from=%s&until=%s" % (start - step, stop)
+    nrstats = (stop - start) / step
+
+    ret = {}
+    retval = {}
+
+    massive_target = ""
+    for target in expression:
+        massive_target += switch_stat[target](uuid) + "&"
+
+    complete_uri = "%s/render?%s%s&format=json" % (uri, massive_target, time) 
+
+    ret = graphite_issue_massive_request(complete_uri, nrstats)
+    
+    for target in expression:
+        if target == 'cpu': 
+            retval[target] = {'cores': 1, 'utilization': ret['cpu']}
+        if target == 'disk': 
+            retval[target] = {
+                 'disks': 1,
+                   'read': {'xvda1': {'disk_ops': ret['disk-read']} },
+                   'write': {'xvda1': {'disk_ops': ret['disk-write']} },
+                 }
+        if target == 'network': 
+            retval[target] =  {'eth0': {'rx': ret['net-recv'], 'tx': ret['net-send']}}
+
+        if target == 'memory': 
+            if len(ret['mem-total']) > 0:
+                if ret['mem-total'][0] == None:
+                    total = 0
+                else:
+                    total = ret['mem-total'][0]
+            else:
+                total = 0
+            retval[target] = {'total': total, 'used': ret['mem']}
+
+        if target == 'load': 
+            retval[target] = ret['load']
+
+    """
+    {'cpu': {'cores': 1, 'utilization': ret['cpu']},
+     'disk': {'disks': 1,
+      'read': {'xvda1': {'disk_ops': ret['disk-read']} },
+      'write': {'xvda1': {'disk_ops': ret['disk-write']} },
+         },
+     'load': ret['load'],
+     'memory': {'total': ret['mem-total'][0], 'used': ret['mem']},
+     'network': {'eth0': {'rx': ret['net-recv'], 'tx': ret['net-send']}}}
+    """
+
+    """
+
+    {u'cpu': {u'cores': 1, u'utilization': ret['cpu']},
+     u'disk': {u'disks': 1,
+      u'read': {u'xvda1': {u'disk_merged': [10, 10],
+        u'disk_octets': [117811200, 117811200],
+        u'disk_ops': [11228, 11228],
+        u'disk_time': [345, 345]}},
+      u'write': {u'xvda1': {u'disk_merged': [69292, 69291],
+        u'disk_octets': [1218277376, 1218248704],
+        u'disk_ops': [135415, 135409],
+        u'disk_time': [153624, 153620]}}},
+     u'load': [0.0],
+     u'memory': {u'total': 116170752.0, u'used': [64438272.0]},
+     u'network': {u'eth0': {u'rx': [0.04453676453899832],
+       u'tx': [0.09384519690292271]}}}
+    """
+
+    return retval
+
 def graphite_get_stats(host, port, uuid, expression, start, stop, step):
     """Returns stats from graphite.
     """
@@ -786,26 +1006,25 @@ def graphite_get_stats(host, port, uuid, expression, start, stop, step):
     uri = "http://%s:%d" %(host, port)
 
     time = "&from=%s&until=%s" % (start, stop)
-    #FIXME: get dummy stats and populate the CPU from the real thing ;-)
-    #ret = dummy_get_stats(expression, start, stop, step)
-    #inject real data into the dummy return response
     ret = {}
 
-    cpu_data = graphite_get_cpu_stats(uri, uuid, time)
-
-    net_data = graphite_get_net_stats(uri, uuid, time)
-
-    load_data = graphite_get_load_stats(uri, uuid, time)
-
-    mem_data = graphite_get_mem_stats(uri, uuid, time)
-
-    disk_data = graphite_get_disk_stats(uri, uuid, time)
-
-    ret['cpu'] = cpu_data
-    ret['network'] = net_data
-    ret['load'] = load_data
-    ret['memory'] = mem_data
-    ret['disk'] = disk_data
+    ret = graphite_get_massive_stats(host, port, uuid, expression, start, stop, step)
+    
+    #cpu_data = graphite_get_cpu_stats(uri, uuid, time)
+    #
+    #net_data = graphite_get_net_stats(uri, uuid, time)
+    #
+    #load_data = graphite_get_load_stats(uri, uuid, time)
+    #
+    #mem_data = graphite_get_mem_stats(uri, uuid, time)
+    #
+    #disk_data = graphite_get_disk_stats(uri, uuid, time)
+    #
+    #ret['cpu'] = cpu_data
+    #ret['network'] = net_data
+    #ret['load'] = load_data
+    #ret['memory'] = mem_data
+    #ret['disk'] = disk_data
 
     return ret
 
