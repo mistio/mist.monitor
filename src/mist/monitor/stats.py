@@ -544,7 +544,7 @@ def graphite_issue_request(uri):
     """ gets data from graphite
     """
 
-    ret = []
+    ret = {}
     if not uri:
         log.warn("You have to specify the backend's URI")
         return ret
@@ -872,7 +872,7 @@ def graphite_issue_massive_request(uri, nrstats):
     """ gets data from graphite
     """
 
-    ret = []
+    ret = {}
     if not uri:
         log.warn("You have to specify the backend's URI")
         return ret
