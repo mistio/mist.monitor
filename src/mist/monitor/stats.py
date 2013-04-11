@@ -612,11 +612,11 @@ def graphite_build_net_target(uuid):
 
     vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
     
-    target = 'derivative(%s.interface-eth0.if_octets.tx)' % (vm_hostname)
+    target = 'derivative(%s.interface*.if_octets*.tx)' % (vm_hostname)
     
     target_uri = "target=alias(%s,'net-send')" % (target) 
 
-    target = 'derivative(%s.interface-eth0.if_octets.rx)' % (vm_hostname)
+    target = 'derivative(%s.interface*.if_octets*.rx)' % (vm_hostname)
 
     target_uri += "&target=alias(%s, 'net-recv')" % (target) 
 
@@ -945,28 +945,49 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
     
     for target in expression:
         if target == 'cpu': 
-            retval[target] = {'cores': 1, 'utilization': ret['cpu']}
+            if ret.has_key('cpu'):
+                retval[target] = {'cores': 1, 'utilization': ret['cpu']}
+            else:
+                retval[target] = {'cores': 1, 'utilization': [0]}
         if target == 'disk': 
-            retval[target] = {
-                 'disks': 1,
-                   'read': {'xvda1': {'disk_ops': ret['disk-read']} },
-                   'write': {'xvda1': {'disk_ops': ret['disk-write']} },
-                 }
+            if ret.has_key('disk-read'):
+                retval[target] = {'disks': 1, 'read': {'xvda1': {'disk_ops': ret['disk-read']}}}
+            else:
+                retval[target] = {'disks': 1, 'read': {'xvda1': {'disk_ops': [0]}}}
+            if ret.has_key('disk-write'):
+                retval[target]['write'] = {'xvda1': {'disk_ops': ret['disk-write']}}
+            else:
+                retval[target]['write'] = {'xvda1': {'disk_ops': [0]}}
+
         if target == 'network': 
-            retval[target] =  {'eth0': {'rx': ret['net-recv'], 'tx': ret['net-send']}}
+            if ret.has_key('net-recv'):
+                retval[target] =  {'eth0': {'rx': ret['net-recv']}}
+            else:
+                retval[target] =  {'eth0': {'rx': [0]}}
+            if ret.has_key('net-send'):
+                retval[target]['eth0']['tx'] = ret['net-send']
+            else:
+                retval[target]['eth0']['tx'] = [0]
 
         if target == 'memory': 
-            if len(ret['mem-total']) > 0:
-                if ret['mem-total'][0] == None:
-                    total = 0
-                else:
-                    total = ret['mem-total'][0]
+            if ret.has_key('mem-total'):
+                if len(ret['mem-total']) > 0:
+                    if ret['mem-total'][0] == None:
+                        total = 0
+                    else:
+                        total = ret['mem-total'][0]
             else:
                 total = 0
-            retval[target] = {'total': total, 'used': ret['mem']}
+            if ret.has_key('mem'):
+                retval[target] = {'total': total, 'used': ret['mem']}
+            else:
+                retval[target] = {'total': total, 'used': [0]}
 
         if target == 'load': 
-            retval[target] = ret['load']
+            if ret.has_key('load'):
+                retval[target] = ret['load']
+            else:
+                retval[target] = [0]
 
     """
     {'cpu': {'cores': 1, 'utilization': ret['cpu']},
