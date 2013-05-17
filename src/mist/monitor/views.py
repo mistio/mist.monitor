@@ -10,6 +10,8 @@ from pyramid.response import Response
 from mist.monitor.stats import mongo_get_stats
 from mist.monitor.stats import graphite_get_stats
 from mist.monitor.stats import dummy_get_stats
+from mist.monitor.rules import add_rule
+from mist.monitor.rules import remove_rule
 
 
 log = getLogger('mist.monitor')
@@ -136,6 +138,21 @@ def remove_machine(request):
     except Exception as e:
         log.error('Error opening collectd conf file: %s' % e)
         return Response('Service unavailable', 503)
+
+    return Response('Success', 200)
+
+
+@view_config(route_name='rules', request_method='PUT', renderer='json')
+def update_rules(request):
+
+    try:
+        params = request.json_body
+        ret = add_rule(params)
+        if ret:
+            log.error('add_rule failed, ret = %d' % ret)
+            return Response('Bad Request', 400)
+    except:
+        return Response('Bad Request', 400)
 
     return Response('Success', 200)
 
