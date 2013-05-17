@@ -16,7 +16,6 @@ from mist.monitor.stats import graphite_build_load_target
 from mist.monitor.stats import graphite_build_net_target
 from mist.monitor.stats import graphite_build_disk_target
 
-GRAPHITE_URL = "http://graphite-2-1.mist.io:80"
 REDIS_URL = "redis://localhost:6379"
 
 log = getLogger('mist.monitor')
@@ -157,7 +156,10 @@ def add_rule(json_rule):
 
 
     params = json_rule
+    host = params.get('host', None)
+    port = params.get('port', None)
     machine_uuid = params.get('uuid', None)
+    graphite_uri = "http://%s:%d" % (host, port)
 
     #let's assume this file exists
     filename = "/conf/galerts-%s.yaml" % machine_uuid
@@ -179,7 +181,7 @@ def add_rule(json_rule):
             f = open(os.getcwd()+filename, 'a')
             settings = settings_template
             alerts = []
-            settings['graphite_url'] = '%s' % GRAPHITE_URL
+            settings['graphite_url'] = '%s' % graphite_uri
             settings['redis_url'] = '%s' % REDIS_URL
             alerts = update_alerts(alerts, params)
             ymlfile = {'settings': settings, 'alerts': alerts}

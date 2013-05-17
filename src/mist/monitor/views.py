@@ -145,9 +145,14 @@ def remove_machine(request):
 @view_config(route_name='rules', request_method='PUT', renderer='json')
 def update_rules(request):
 
+    backend = request.registry.settings['backend']
+    host = backend['host']
+    port = backend['port']
     try:
         params = request.json_body
         action = params.get('action', None)
+        params['host'] = host
+        params['port'] = port
         if 'add' in action:
             ret = add_rule(params)
         else:
