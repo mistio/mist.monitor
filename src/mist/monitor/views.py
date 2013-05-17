@@ -147,13 +147,18 @@ def update_rules(request):
 
     try:
         params = request.json_body
-        ret = add_rule(params)
+        action = params.get('action', None)
+        if 'add' in action:
+            ret = add_rule(params)
+        else:
+            ret = remove_rule(params)
         if ret:
-            log.error('add_rule failed, ret = %d' % ret)
+            log.error('rule action failed, ret = %d' % ret)
             return Response('Bad Request', 400)
     except:
         return Response('Bad Request', 400)
 
+    log.debug('rule action %s, ret = %d' % (action, ret))
     return Response('Success', 200)
 
 
@@ -212,6 +217,6 @@ def get_stats(request):
         log.error('Requested invalid monitoring backend: %s' % backend)
         return Response('Service unavailable', 503)
 
-    log.debug("uuid = %s, expression = %s, start = %d, stop = %d, step = %d" % (uuid, expression, start, stop, step))
+    #log.debug("uuid = %s, expression = %s, start = %d, stop = %d, step = %d" % (uuid, expression, start, stop, step))
     #log.debug(stats)
     return stats
