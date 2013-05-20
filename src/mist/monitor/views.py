@@ -150,7 +150,7 @@ def update_rules(request):
     port = backend['port']
     try:
         params = request.json_body
-        action = params.get('action', None)
+        action = params.get('rule_action', None)
         params['host'] = host
         params['port'] = port
         if 'add' in action:
