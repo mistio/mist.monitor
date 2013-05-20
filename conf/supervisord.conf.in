@@ -44,3 +44,10 @@ process_name = mongodb
 directory = ${buildout:directory}/bin
 priority = 30
 redirect_stderr = false
+
+[program:alert]
+command = ${buildout:directory}/bin/mist-alert
+process_name = alert
+directory = ${buildout:directory}
+priority = 40
+redirect_stderr = false
