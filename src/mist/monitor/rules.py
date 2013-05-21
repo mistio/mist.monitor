@@ -16,16 +16,14 @@ from mist.monitor.stats import graphite_build_load_target
 from mist.monitor.stats import graphite_build_net_target
 from mist.monitor.stats import graphite_build_disk_target
 
-REDIS_URL = "redis://localhost:6379"
-
 log = getLogger('mist.monitor')
 
 metrics = ['cpu', 'ram', 'load', 'disk', 'network']
 
-graphite_url = redis_url = ''
+graphite_url = core_url = ""
 
 settings_template = {'graphite_url': graphite_url, 
-                     'redis_url': redis_url, 
+                     'core_url': core_url, 
                      'pagerduty_key': '', 
                      'hipchat_key':'', 
                      'graphite_auth_user': '', 
@@ -160,6 +158,9 @@ def add_rule(json_rule):
     port = params.get('port', None)
     machine_uuid = params.get('uuid', None)
     graphite_uri = "http://%s:%d" % (host, port)
+    host = "core-2.mist.io"
+    port = 80
+    core_uri = "http://%s:%d" % (host, port)
 
     #let's assume this file exists
     filename = "/conf/galerts-%s.yaml" % machine_uuid
@@ -182,7 +183,7 @@ def add_rule(json_rule):
             settings = settings_template
             alerts = []
             settings['graphite_url'] = '%s' % graphite_uri
-            settings['redis_url'] = '%s' % REDIS_URL
+            settings['core_url'] = '%s' % core_uri
             alerts = update_alerts(alerts, params)
             ymlfile = {'settings': settings, 'alerts': alerts}
             yaml.dump(ymlfile, f, default_flow_style=False, indent=8, explicit_end=None, explicit_start=None, encoding=None)
