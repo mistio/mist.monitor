@@ -158,9 +158,14 @@ def add_rule(json_rule):
     port = params.get('port', None)
     machine_uuid = params.get('uuid', None)
     graphite_uri = "http://%s:%d" % (host, port)
+    #FIXME: get core_uri dynamically
     host = "core-2.mist.io"
     port = 80
     core_uri = "http://%s:%d" % (host, port)
+    #FIXME: find a way to get the machine's IP, name and DNS name
+    #name = params.get('name', None)
+    #dns_name = params.get('dns_name', None)
+    #public_ips = params.get('public_ips', [])
 
     #let's assume this file exists
     filename = "/conf/galerts-%s.yaml" % machine_uuid
@@ -184,6 +189,13 @@ def add_rule(json_rule):
             alerts = []
             settings['graphite_url'] = '%s' % graphite_uri
             settings['core_url'] = '%s' % core_uri
+            #FIXME: find a way to get the machine's IP, name and DNS name (see above)
+            #if public_ips:
+            #    settings['public_ips'] = public_ips
+            #if dns_name:
+            #    settings['dns_name'] = dns_name.encode('ascii', 'ignore')
+            #if name:
+            #    settings['name'] = name.encode('ascii', 'ignore')
             alerts = update_alerts(alerts, params)
             ymlfile = {'settings': settings, 'alerts': alerts}
             yaml.dump(ymlfile, f, default_flow_style=False, indent=8, explicit_end=None, explicit_start=None, encoding=None)
