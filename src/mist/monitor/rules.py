@@ -76,6 +76,10 @@ def update_alert(alerts, rule_id, alert_target, metric, operator, value):
         if not rules:
             log.debug("Something terrible has happened, no rules available")
         log.debug("rules = %s" % rules)
+        if 'cpu' in alert_target:
+            #print "orig value %d" % value
+            value = float(value)/100
+            #print "value %f" % value
         condition = "%s %s" % (op_func[operator], value)
         log.debug(condition)
         rule = { str(condition).encode('ascii', 'ignore'): "critical" }
@@ -113,6 +117,10 @@ def add_alert(alerts, rule_id, alert_target, metric, operator, value):
     alert['name'] = str(alert['name']).encode('ascii', 'ignore')
     alert['notifiers'] = ['mail']
     alert['target'] = str(alert_target).encode('ascii', 'ignore')
+    if 'cpu' in alert_target:
+        #print "orig value %s" % value
+        value = float(value)/100
+        #print "value %f" % value
     condition = "%s %s" % (op_func[operator], value)
     rule = { str(condition).encode('ascii', 'ignore'): "critical" }
     alert['rules'] = [rule]
@@ -136,6 +144,7 @@ def update_alerts(alerts, params):
     if not alerts:
         alerts = []
         ret = add_alert(alerts, rule_id, alert_target, metric, operator, value)
+        log.error("returning alerts %s" % alerts)
         return alerts
 
     ret = update_alert(alerts, rule_id, alert_target, metric, operator, value)
