@@ -20,6 +20,7 @@ from pyramid.response import Response
 #from scipy import interpolate
 
 from logging import getLogger
+from logging import WARNING
 
 from pymongo import Connection
 from pymongo import DESCENDING
@@ -30,6 +31,8 @@ MACHINE_PREFIX = "mist"
 
 log = getLogger('mist.monitor')
 
+requests_log = getLogger("requests")
+requests_log.setLevel(WARNING)
 
 def resize_stats(stats, nr_requested):
     """Returns stats that match the requested size.
@@ -884,7 +887,7 @@ def graphite_issue_massive_request(uri, nrstats):
         return ret
     
     if req.status_code != 200:
-        log.warn("Got response different than 200")
+        #log.warn("Got response different than 200")
         return ret
 
     json_len = len(req.json())
@@ -898,7 +901,7 @@ def graphite_issue_massive_request(uri, nrstats):
         data_len = len(data)
         index = req.json()[i]['target']
         real_list_data[index] = []
-        log.warn("%s %d %d" % (index, data_len, nrstats))
+        #log.warn("%s %d %d" % (index, data_len, nrstats))
         real_list_data[index] = [j[0] for j in data]
         #real_list_data[index] = [j[0] if j[0].__class__ in [float,int] else 0.1 for j in data]
         if (len(real_list_data[index]) > 1):
