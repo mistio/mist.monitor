@@ -33,6 +33,7 @@ settings_template = {'graphite_url': graphite_url,
 alert_template = {'check_method': '', 
                   'from': '', 
                   'name': '', 
+                  'time_to_wait': 60, 
                   'notifiers': [], 
                   'target': '', 
                   'rules': [] 
@@ -60,7 +61,7 @@ def build_alert_target(uuid, metric):
 
     return ret_target
     
-def update_alert(alerts, rule_id, alert_target, metric, operator, value):
+def update_alert(alerts, rule_id, alert_target, metric, operator, value, time_to_wait):
     """
     """
 
@@ -105,13 +106,14 @@ def update_alert(alerts, rule_id, alert_target, metric, operator, value):
     return 1
 
     
-def add_alert(alerts, rule_id, alert_target, metric, operator, value):
+def add_alert(alerts, rule_id, alert_target, metric, operator, value, time_to_wait):
     """
     """
 
     alert = alert_template
     alert['check_method'] = 'average'
     alert['from'] = '-10mins'
+    alert['time_to_wait'] = time_to_wait
     #alert['name'] = "%s-%s" % (metric, rule_id)
     alert['name'] = "%s" % rule_id
     alert['name'] = str(alert['name']).encode('ascii', 'ignore')
@@ -138,21 +140,22 @@ def update_alerts(alerts, params):
     value = params.get('value', None)
     rule_id = params.get('rule_id', None)
     operator = params.get('operator', None)
+    time_to_wait = params.get('time_to_wait', 60)
     alert_target = build_alert_target(machine_uuid, metric)
     alert_target = str(alert_target).encode('ascii', 'ignore')
     
     if not alerts:
         alerts = []
-        ret = add_alert(alerts, rule_id, alert_target, metric, operator, value)
+        ret = add_alert(alerts, rule_id, alert_target, metric, operator, value, time_to_wait)
         log.error("returning alerts %s" % alerts)
         return alerts
 
-    ret = update_alert(alerts, rule_id, alert_target, metric, operator, value)
+    ret = update_alert(alerts, rule_id, alert_target, metric, operator, value, time_to_wait)
     if not ret:
         log.info("alert updated successfully")
     else:
         log.error("alert not found, will create a new one")
-        ret = add_alert(alerts, rule_id, alert_target, metric, operator, value)
+        ret = add_alert(alerts, rule_id, alert_target, metric, operator, value, time_to_wait)
 
     return alerts
 
