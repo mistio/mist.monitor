@@ -146,13 +146,18 @@ def remove_machine(request):
 def update_rules(request):
 
     backend = request.registry.settings['backend']
+    core = request.registry.settings['core']
     host = backend['host']
     port = backend['port']
+    core_host = core['host']
+    core_port = core['port']
     try:
         params = request.json_body
         action = params.get('rule_action', None)
         params['host'] = host
         params['port'] = port
+        params['core_host'] = core_host
+        params['core_port'] = core_port
         if 'add' in action:
             ret = add_rule(params)
         else:

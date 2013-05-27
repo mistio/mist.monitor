@@ -171,10 +171,16 @@ def add_rule(json_rule):
     machine_uuid = params.get('uuid', None)
     machine_password = params.get('machine_password', None)
     graphite_uri = "http://%s:%d" % (host, port)
-    #FIXME: get core_uri dynamically
-    host = "core-2.mist.io"
-    port = 80
-    core_uri = "http://%s:%d" % (host, port)
+    core_host = params.get('core_host', None)
+    core_port = params.get('core_port', 0)
+    if core_port == 80:
+        protocol = "http://"
+    elif core_port == 443:
+        protocol = "https://"
+    else:
+        log.error("Cannot add core_uri for alerting")
+        return 1
+    core_uri = "%s%s:%d" % (protocol, core_host, core_port)
     machine_password = str(machine_password).encode('ascii', 'ignore')
     #FIXME: find a way to get the machine's IP, name and DNS name
     #name = params.get('name', None)
