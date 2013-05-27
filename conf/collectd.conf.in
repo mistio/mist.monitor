@@ -22,7 +22,7 @@ LoadPlugin match_regex
 LoadPlugin target_set
 
 LoadPlugin rrdtool
-LoadPlugin write_mongodb
+#LoadPlugin write_mongodb
 
 <Plugin rrdtool>
         DataDir "${buildout:directory}/var/rrd"

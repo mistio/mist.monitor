@@ -1,8 +1,7 @@
 Changelog
 =========
 
-0.1-dev (unreleased)
+0.1 [2013-05-27]
 --------------------
 
-- Package created using templer
-  []
+- Initial stable release with working alerts
