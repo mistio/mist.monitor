@@ -24,6 +24,7 @@ graphite_url = core_url = ""
 
 settings_template = {'graphite_url': graphite_url, 
                      'core_url': core_url, 
+                     'machine_password': '',
                      'pagerduty_key': '', 
                      'hipchat_key':'', 
                      'graphite_auth_user': '', 
@@ -164,16 +165,17 @@ def add_rule(json_rule):
     """
     """
 
-
     params = json_rule
     host = params.get('host', None)
     port = params.get('port', None)
     machine_uuid = params.get('uuid', None)
+    machine_password = params.get('machine_password', None)
     graphite_uri = "http://%s:%d" % (host, port)
     #FIXME: get core_uri dynamically
     host = "core-2.mist.io"
     port = 80
     core_uri = "http://%s:%d" % (host, port)
+    machine_password = str(machine_password).encode('ascii', 'ignore')
     #FIXME: find a way to get the machine's IP, name and DNS name
     #name = params.get('name', None)
     #dns_name = params.get('dns_name', None)
@@ -199,6 +201,7 @@ def add_rule(json_rule):
             f = open(os.getcwd()+filename, 'a')
             settings = settings_template
             alerts = []
+            settings['machine_password'] = '%s' % machine_password 
             settings['graphite_url'] = '%s' % graphite_uri
             settings['core_url'] = '%s' % core_uri
             #FIXME: find a way to get the machine's IP, name and DNS name (see above)
