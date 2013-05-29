@@ -24,6 +24,7 @@ graphite_url = core_url = ""
 
 settings_template = {'graphite_url': graphite_url, 
                      'core_url': core_url, 
+                     'user': '',
                      'machine_password': '',
                      'pagerduty_key': '', 
                      'hipchat_key':'', 
@@ -170,6 +171,7 @@ def add_rule(json_rule):
     port = params.get('port', None)
     machine_uuid = params.get('uuid', None)
     machine_password = params.get('machine_password', None)
+    user_email = params.get('email', None)
     graphite_uri = "http://%s:%d" % (host, port)
     core_host = params.get('core_host', None)
     core_port = params.get('core_port', 0)
@@ -181,6 +183,7 @@ def add_rule(json_rule):
         log.error("Cannot add core_uri for alerting")
         return 1
     core_uri = "%s%s:%d" % (protocol, core_host, core_port)
+    user_email = str(user_email).encode('ascii', 'ignore')
     machine_password = str(machine_password).encode('ascii', 'ignore')
     #FIXME: find a way to get the machine's IP, name and DNS name
     #name = params.get('name', None)
@@ -210,6 +213,7 @@ def add_rule(json_rule):
             settings['machine_password'] = '%s' % machine_password 
             settings['graphite_url'] = '%s' % graphite_uri
             settings['core_url'] = '%s' % core_uri
+            settings['user'] = '%s' % user_email
             #FIXME: find a way to get the machine's IP, name and DNS name (see above)
             #if public_ips:
             #    settings['public_ips'] = public_ips
