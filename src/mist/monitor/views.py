@@ -8,7 +8,7 @@ from pyramid.view import view_config
 from pyramid.response import Response
 
 from mist.monitor.stats import mongo_get_stats
-from mist.monitor.stats import graphite_get_stats
+from mist.monitor.stats import graphite_get_stats, graphite_get_loadavg
 from mist.monitor.stats import dummy_get_stats
 from mist.monitor.rules import add_rule
 from mist.monitor.rules import remove_rule
@@ -170,6 +170,28 @@ def update_rules(request):
 
     log.debug('rule action %s, ret = %d' % (action, ret))
     return Response('Success', 200)
+
+
+@view_config(route_name='loadavg', request_method='GET', renderer='json')
+def get_loadavg(request):
+    """Returns a load avg png
+    """
+    backend = request.registry.settings['backend']
+    uuid = request.matchdict['machine']
+
+    if not uuid:
+        return Response('Bad Request', 400)
+
+    host = backend['host']
+    port = backend['port']
+
+    if not uuid:
+        log.error("cannot find uuid %s" % uuid)
+        return Response('Bad Request', 400)
+    
+    resp = graphite_get_loadavg(host, port, uuid)
+
+    return resp
 
 
 @view_config(route_name='stats', request_method='GET', renderer='json')
