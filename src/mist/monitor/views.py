@@ -178,6 +178,10 @@ def get_loadavg(request):
     """
     backend = request.registry.settings['backend']
     uuid = request.matchdict['machine']
+    params = request.params
+    start = params.get('start', time() - 3600)
+    step = params.get('step', 10)
+    print start, step
 
     if not uuid:
         return Response('Bad Request', 400)
@@ -189,7 +193,7 @@ def get_loadavg(request):
         log.error("cannot find uuid %s" % uuid)
         return Response('Bad Request', 400)
     
-    resp = graphite_get_loadavg(host, port, uuid)
+    resp = graphite_get_loadavg(host, port, uuid, start, step)
 
     return resp
 

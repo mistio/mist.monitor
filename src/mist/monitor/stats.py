@@ -1023,20 +1023,19 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
 
     return retval
 
-def graphite_get_loadavg(host, port, uuid):
+def graphite_get_loadavg(host, port, uuid, start, step):
     """Returns loadavg png from graphite.
     """
 
     uri = "http://%s:%d" %(host, port)
 
-    time = "&from=%s" % ("-1hours")
     ret = {}
+    minute_step = max(int(step)/60, 10)
 
     graph_options = 'width=50&height=20&format=png&areaMode=first&graphOnly=true&bgcolor=ffffff88&colorList=068f06'
-    time_options = 'from=-1hours&until=-5mins'
-    target = "summarize(mist-%s.load.load.midterm, '1mins', avg)" % uuid
+    time_options = 'from=%d&until=-5mins' % int(start)
+    target = "summarize(mist-%s.load.load.midterm, '%dmins', avg)" % (uuid, minute_step)
     final_uri = '%s/render?target=%s&%s&%s' % (uri, target, graph_options, time_options) 
-    #print final_uri
     ret = final_uri
     
     return ret
