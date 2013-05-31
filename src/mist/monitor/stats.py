@@ -20,7 +20,7 @@ from pyramid.response import Response
 #from scipy import interpolate
 
 from logging import getLogger
-from logging import WARNING
+from logging import WARNING, DEBUG
 
 from pymongo import Connection
 from pymongo import DESCENDING
@@ -33,6 +33,8 @@ log = getLogger('mist.monitor')
 
 requests_log = getLogger("requests")
 requests_log.setLevel(WARNING)
+
+req_session = None
 
 def resize_stats(stats, nr_requested):
     """Returns stats that match the requested size.
@@ -889,14 +891,20 @@ def graphite_get_disk_stats(uri, uuid, time):
 def graphite_issue_massive_request(uri, nrstats):
     """ gets data from graphite
     """
+    global req_session
 
     ret = {}
     if not uri:
         log.warn("You have to specify the backend's URI")
         return ret
+    if not req_session:
+        req_session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=100)
+        req_session.mount('http://', adapter)
+        req_session.keep_alive = True
 
     try:
-        req = requests.get(uri, params=None)
+        req = req_session.get(uri, params=None)
     except:
         log.warn("Could not get data from graphite")
         return ret
