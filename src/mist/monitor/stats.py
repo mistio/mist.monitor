@@ -639,6 +639,21 @@ def graphite_build_load_target(uuid):
     return target_uri
 
 
+def graphite_build_mem_target_v2(uuid):
+    """
+    """
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+
+    target_used = 'sumSeries(%s.memory.memory-{buffered,cached,used})' % (vm_hostname)
+    target_total= 'sumSeries(%s.memory.memory-*)' % (vm_hostname)
+    target_perc = 'asPercent(%s, %s)' % (target_used, target_total)
+    
+    target_uri = "target=alias(%s,'mem')" % (target_perc) 
+
+    return target_uri
+
+
 def graphite_build_mem_target(uuid):
     """
     """
@@ -922,7 +937,7 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
     """Returns stats from graphite.
     """
     switch_stat = {'cpu': graphite_build_cpu_target,
-                   'memory': graphite_build_mem_target,
+                   'memory': graphite_build_mem_target_v2,
                    'load': graphite_build_load_target,
                    'network': graphite_build_net_target,
                    'disk': graphite_build_disk_target 
@@ -934,13 +949,20 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
     #In the case of derivatives we get None and D3 chokes on this. 
     time = "&from=%s&until=%s" % (start - step, stop)
     nrstats = (stop - start) / step
+    INTERVAL = 10
+    if step < INTERVAL:
+        step = INTERVAL
 
     ret = {}
     retval = {}
 
     massive_target = ""
     for target in expression:
-        massive_target += switch_stat[target](uuid) + "&"
+        # FIXME: will incororate this for zooming in/out of a specific time
+        # period, major TODO
+        #iter_target = 'summarize(%s, %dmins, avg)' % (switch_stat[target](uuid), step)
+        iter_target = '%s' % (switch_stat[target](uuid))
+        massive_target += iter_target + "&"
 
     complete_uri = "%s/render?%s%s&format=json" % (uri, massive_target, time) 
 
@@ -973,18 +995,18 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
                 retval[target]['eth0']['tx'] = [0]
 
         if target == 'memory': 
-            if ret.has_key('mem-total'):
-                if len(ret['mem-total']) > 0:
-                    if ret['mem-total'][0] == None:
-                        total = 0
-                    else:
-                        total = ret['mem-total'][0]
-            else:
-                total = 0
+            #if ret.has_key('mem-total'):
+            #    if len(ret['mem-total']) > 0:
+            #        if ret['mem-total'][0] == None:
+            #            total = 0
+            #        else:
+            #            total = ret['mem-total'][0]
+            #else:
+            #    total = 0
             if ret.has_key('mem'):
-                retval[target] = {'total': total, 'used': ret['mem']}
+                retval[target] = ret['mem']
             else:
-                retval[target] = {'total': total, 'used': [0]}
+                retval[target] = [0]
 
         if target == 'load': 
             if ret.has_key('load'):
@@ -1032,7 +1054,7 @@ def graphite_get_loadavg(host, port, uuid, start, step):
     ret = {}
     minute_step = max(int(step)/60, 10)
 
-    graph_options = 'width=50&height=20&format=png&areaMode=first&graphOnly=true&bgcolor=ffffff88&colorList=068f06'
+    graph_options = 'width=100&height=20&format=png&areaMode=first&graphOnly=true&bgcolor=ffffff88&colorList=068f06'
     time_options = 'from=%d&until=-5mins' % int(start)
     target = "summarize(mist-%s.load.load.midterm, '%dmins', avg)" % (uuid, minute_step)
     final_uri = '%s/render?target=%s&%s&%s' % (uri, target, graph_options, time_options) 

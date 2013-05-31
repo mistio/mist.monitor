@@ -11,7 +11,8 @@ from datetime import datetime
 from logging import getLogger
 
 from mist.monitor.stats import graphite_build_cpu_target
-#from mist.monitor.stats import graphite_build_mem_target
+from mist.monitor.stats import graphite_build_mem_target_v2
+from mist.monitor.stats import graphite_build_mem_target
 from mist.monitor.stats import graphite_build_load_target
 from mist.monitor.stats import graphite_build_net_target
 from mist.monitor.stats import graphite_build_disk_target
@@ -43,21 +44,6 @@ alert_template = {'check_method': '',
                  }
 
 op_func = {'gt': 'greater than', 'lt': 'less than'}
-
-def graphite_build_mem_target_v2(uuid):
-    """
-    """
-
-    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
-
-    target_used = 'sumSeries(%s.memory.memory-{buffered,cached,used})' % (vm_hostname)
-    target_total= 'sumSeries(%s.memory.memory-*)' % (vm_hostname)
-    target_perc = 'asPercent(%s, %s)' % (target_used, target_total)
-    
-    target_uri = "alias(%s,'mem')" % (target_perc) 
-    print target_uri
-
-    return target_uri
 
 
 def build_alert_target(uuid, metric):
