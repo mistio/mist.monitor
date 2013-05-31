@@ -11,10 +11,11 @@ from datetime import datetime
 from logging import getLogger
 
 from mist.monitor.stats import graphite_build_cpu_target
-from mist.monitor.stats import graphite_build_mem_target
+#from mist.monitor.stats import graphite_build_mem_target
 from mist.monitor.stats import graphite_build_load_target
 from mist.monitor.stats import graphite_build_net_target
 from mist.monitor.stats import graphite_build_disk_target
+from mist.monitor.stats import MACHINE_PREFIX
 
 log = getLogger('mist.monitor')
 
@@ -43,13 +44,30 @@ alert_template = {'check_method': '',
 
 op_func = {'gt': 'greater than', 'lt': 'less than'}
 
+def graphite_build_mem_target_v2(uuid):
+    """
+    """
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+
+    target_used = 'sumSeries(%s.memory.memory-{buffered,cached,used})' % (vm_hostname)
+    target_total= 'sumSeries(%s.memory.memory-*)' % (vm_hostname)
+    target_perc = 'asPercent(%s, %s)' % (target_used, target_total)
+    
+    target_uri = "alias(%s,'mem')" % (target_perc) 
+    print target_uri
+
+    return target_uri
+
+
 def build_alert_target(uuid, metric):
     """
     """
 
     switch_stat = {'cpu': graphite_build_cpu_target,
-                   #FIXME (graphite uri for memory is incorrect)
-                   'ram': graphite_build_mem_target, 
+                   #FIXME we override this function to get
+                   # the percentage through graphite
+                   'ram': graphite_build_mem_target_v2, 
                    'load': graphite_build_load_target,
                    'network': graphite_build_net_target,
                    'disk': graphite_build_disk_target 
