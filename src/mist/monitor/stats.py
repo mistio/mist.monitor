@@ -1060,11 +1060,13 @@ def graphite_get_loadavg(host, port, uuid, start, step):
     uri = "http://%s:%d" %(host, port)
 
     ret = {}
-    minute_step = max(int(step)/60, 10)
+    minute_step = max(int(step)/60, 5)
 
-    graph_options = 'width=100&height=20&format=png&areaMode=first&graphOnly=true&bgcolor=ffffff88&colorList=068f06'
+    graph_options = 'width=100&height=20&format=png&areaMode=stacked&graphOnly=true&bgcolor=ffffff00&colorList=068f06,ff8f06,f00f06'
     time_options = 'from=%d&until=-5mins' % int(start)
-    target = "summarize(mist-%s.load.load.midterm, '%dmins', avg)" % (uuid, minute_step)
+    target = "summarize(scale(mist-%s.load.load.midterm, 0.7), '%dmins', avg)" % (uuid, minute_step)
+    target += "&target=summarize(scale(mist-%s.load.load.midterm, 0.2), '%dmins', avg)" % (uuid, minute_step)
+    target += "&target=summarize(scale(mist-%s.load.load.midterm, 0.1), '%dmins', avg)" % (uuid, minute_step)
     final_uri = '%s/render?target=%s&%s&%s' % (uri, target, graph_options, time_options) 
     ret = final_uri
     

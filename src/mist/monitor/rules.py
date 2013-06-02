@@ -22,10 +22,13 @@ log = getLogger('mist.monitor')
 
 metrics = ['cpu', 'ram', 'load', 'disk', 'network']
 
+REMINDER_LIST = [60, 120, 1800, 3600, 7200]
+
 graphite_url = core_url = ""
 
 settings_template = {'graphite_url': graphite_url, 
                      'core_url': core_url, 
+                     'reminder_list': [], 
                      'user': '',
                      'machine_password': '',
                      'pagerduty_key': '', 
@@ -175,6 +178,7 @@ def add_rule(json_rule):
     port = params.get('port', None)
     machine_uuid = params.get('uuid', None)
     machine_password = params.get('machine_password', None)
+    reminder_list = params.get('reminder_list', REMINDER_LIST)
     user_email = params.get('email', None)
     graphite_uri = "http://%s:%d" % (host, port)
     core_host = params.get('core_host', None)
@@ -218,6 +222,8 @@ def add_rule(json_rule):
             settings['graphite_url'] = '%s' % graphite_uri
             settings['core_url'] = '%s' % core_uri
             settings['user'] = '%s' % user_email
+            settings['reminder_list'] = reminder_list 
+            print reminder_list
             #FIXME: find a way to get the machine's IP, name and DNS name (see above)
             #if public_ips:
             #    settings['public_ips'] = public_ips
