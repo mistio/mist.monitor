@@ -955,7 +955,7 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
 
     #FIXME: we ask for one more number in order to skip the first one returned.
     #In the case of derivatives we get None and D3 chokes on this. 
-    time = "&from=%s&until=%s" % (start - step, stop)
+    time_interval = "&from=%s&until=%s" % (start - step, stop)
     nrstats = (stop - start) / step
     INTERVAL = 10
     if step < INTERVAL:
@@ -972,7 +972,7 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
         iter_target = '%s' % (switch_stat[target](uuid))
         massive_target += iter_target + "&"
 
-    complete_uri = "%s/render?%s%s&format=json" % (uri, massive_target, time) 
+    complete_uri = "%s/render?%s%s&format=json" % (uri, massive_target, time_interval) 
 
     ret = graphite_issue_massive_request(complete_uri, nrstats)
     
@@ -1064,9 +1064,10 @@ def graphite_get_loadavg(host, port, uuid, start, step):
 
     graph_options = 'width=100&height=20&format=png&areaMode=stacked&graphOnly=true&bgcolor=ffffff00&colorList=068f06,ff8f06,f00f06'
     time_options = 'from=%d&until=-5mins' % int(start)
-    target = "summarize(scale(mist-%s.load.load.midterm, 0.7), '%dmins', avg)" % (uuid, minute_step)
-    target += "&target=summarize(scale(mist-%s.load.load.midterm, 0.2), '%dmins', avg)" % (uuid, minute_step)
-    target += "&target=summarize(scale(mist-%s.load.load.midterm, 0.1), '%dmins', avg)" % (uuid, minute_step)
+    target = "summarize(scale(mist-%s.load.load.midterm, 1), '%dmins', avg)" % (uuid, minute_step)
+    #target = "summarize(scale(mist-%s.load.load.midterm, 0.7), '%dmins', avg)" % (uuid, minute_step)
+    #target += "&target=summarize(scale(mist-%s.load.load.midterm, 0.2), '%dmins', avg)" % (uuid, minute_step)
+    #target += "&target=summarize(scale(mist-%s.load.load.midterm, 0.1), '%dmins', avg)" % (uuid, minute_step)
     final_uri = '%s/render?target=%s&%s&%s' % (uri, target, graph_options, time_options) 
     ret = final_uri
     
