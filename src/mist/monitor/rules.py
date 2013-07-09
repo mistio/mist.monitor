@@ -22,7 +22,17 @@ log = getLogger('mist.monitor')
 
 metrics = ['cpu', 'ram', 'load', 'disk', 'network']
 
-REMINDER_LIST = [60, 120, 1800, 3600, 7200]
+REMINDER_LIST = [60, # 1min
+                 5 * 60, # 5mins 
+                 10 * 60, # 10mins 
+                 30 * 60, # 30mins
+                 60 * 60, # 1h
+                 2 * 3600, # 2h
+                 6 * 3600, # 6h
+                 10 * 3600, # 10h
+                 20 * 3600, # 20h 
+                 24 * 3600, # 1d
+                ] # 
 
 graphite_url = core_url = ""
 
@@ -121,7 +131,7 @@ def add_alert(alerts, rule_id, alert_target, metric, operator, value, time_to_wa
 
     alert = alert_template
     alert['check_method'] = 'average'
-    alert['from'] = '-10mins'
+    alert['from'] = '-5mins'
     alert['time_to_wait'] = time_to_wait
     #alert['name'] = "%s-%s" % (metric, rule_id)
     alert['name'] = "%s" % rule_id
@@ -284,6 +294,9 @@ def remove_rule(request):
         settings = ymlfile.get('settings', None)
         alerts = remove_alert(alerts, params)
         ymlfile = {'alerts': alerts, 'settings': settings}
+        print len(alerts)
+        if len(alerts) == 1:
+            os.remove(os.getcwd()+filename)
         f = open(os.getcwd()+filename, "w")
         yaml.dump(ymlfile, f, default_flow_style=False, indent=8, explicit_end=None, explicit_start=None, encoding=None)
         f.close()

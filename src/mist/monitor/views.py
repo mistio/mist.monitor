@@ -139,6 +139,12 @@ def remove_machine(request):
         log.error('Error opening collectd conf file: %s' % e)
         return Response('Service unavailable', 503)
 
+    filename = "/conf/galerts-%s.yaml" % uuid
+    try:
+        os.remove(os.getcwd()+filename)
+    except Exception as e:
+        log.error('Error removing alert file: %s' % e)
+
     return Response('Success', 200)
 
 
