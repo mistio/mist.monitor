@@ -1,7 +1,18 @@
 Changelog
 =========
 
+0.2 [2013-06-03]
+----------------
+
+- add user email just to clarify which rule we are checking (for debugging)
+- support loadavg png for machine list view
+- fix mem target for alerts
+- simplify the way we get and push memory stats
+- adding requests-session pools for mist.monitor->graphite communication
+- add reminder list option for a rule that stays on
+
+
 0.1 [2013-05-27]
---------------------
+----------------
 
 - Initial stable release with working alerts
