@@ -186,6 +186,8 @@ def add_rule(json_rule):
     params = json_rule
     host = params.get('host', None)
     port = params.get('port', None)
+    backend_id = params.get('backend_id', None)
+    machine_id = params.get('machine_id', None)
     machine_uuid = params.get('uuid', None)
     machine_password = params.get('machine_password', None)
     reminder_list = params.get('reminder_list', REMINDER_LIST)
@@ -203,6 +205,8 @@ def add_rule(json_rule):
     core_uri = "%s%s:%d" % (protocol, core_host, core_port)
     user_email = str(user_email).encode('ascii', 'ignore')
     machine_password = str(machine_password).encode('ascii', 'ignore')
+    machine_id = str(machine_id).encode('ascii', 'ignore')
+    backend_id = str(backend_id).encode('ascii', 'ignore')
     #FIXME: find a way to get the machine's IP, name and DNS name
     #name = params.get('name', None)
     #dns_name = params.get('dns_name', None)
@@ -233,7 +237,10 @@ def add_rule(json_rule):
             settings['core_url'] = '%s' % core_uri
             settings['user'] = '%s' % user_email
             settings['reminder_list'] = reminder_list 
-            print reminder_list
+            settings['machine_id'] = machine_id
+            settings['backend_id'] = backend_id 
+            print settings
+            #print reminder_list
             #FIXME: find a way to get the machine's IP, name and DNS name (see above)
             #if public_ips:
             #    settings['public_ips'] = public_ips
