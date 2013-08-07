@@ -611,19 +611,52 @@ def graphite_build_cpu_target(uuid):
     return target_uri 
 
 
-def graphite_build_net_target(uuid):
+def graphite_build_net_tx_target(uuid):
     """
     """
 
     vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
-    
-    target = 'derivative(%s.interface*.if_octets*.tx)' % (vm_hostname)
+
+    target = 'derivative(sumSeries(%s.interface*.if_octets*.tx))' % (vm_hostname)
     
     target_uri = "target=alias(%s,'net-send')" % (target) 
 
-    target = 'derivative(%s.interface*.if_octets*.rx)' % (vm_hostname)
+    return target_uri
 
-    target_uri += "&target=alias(%s, 'net-recv')" % (target) 
+
+def graphite_build_net_rx_target(uuid):
+    """
+    """
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+
+    target = 'derivative(sumSeries(%s.interface*.if_octets*.rx))' % (vm_hostname)
+
+    target_uri = "target=alias(%s,'net-recv')" % (target) 
+
+    return target_uri
+
+
+def graphite_build_net_target(uuid, action=None):
+    """
+    """
+
+    switch_stat = {'send': graphite_build_net_tx_target,
+                   'recv': graphite_build_net_rx_target,
+                  }
+
+    
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+
+    if not action:
+        target_uri = '%s' % (switch_stat['send'](uuid))
+        target_uri += '&%s' % (switch_stat['recv'](uuid))
+    elif action == 'send' or action == 'recv':
+        target_uri = '%s' % (switch_stat[action](uuid))
+    else:
+        log.error("No such action %s, returning both" % action)
+        target_uri = '%s' % (switch_stat['send'](uuid))
+        target_uri += '&%s' % (switch_stat['recv'](uuid))
 
     return target_uri
 
@@ -673,22 +706,55 @@ def graphite_build_mem_target(uuid):
     return target_uri
 
 
-def graphite_build_disk_target(uuid):
+def graphite_build_disk_read_target(uuid):
     """
     """
 
     vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
 
     #disk_types = ['disk_merged', 'disk_octets', 'disk_ops', 'disk_time' ]
-    disk_type = 'disk_ops'
+    disk_type = 'disk_octets'
     target = 'derivative(sumSeries(%s.disk-*.%s.read))' % (vm_hostname, disk_type)
         
     target_uri = "target=alias(%s,'disk-read')" % (target) 
-    
+
+    return target_uri
+
+
+def graphite_build_disk_write_target(uuid):
+    """
+    """
+
+    vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+
+    #disk_types = ['disk_merged', 'disk_octets', 'disk_ops', 'disk_time' ]
+    disk_type = 'disk_octets'
     target = 'derivative(sumSeries(%s.disk-*.%s.write))' % (vm_hostname, disk_type)
 
-    target_uri += "&target=alias(%s,'disk-write')" % (target) 
+    target_uri = "target=alias(%s,'disk-write')" % (target) 
         
+    return target_uri
+
+
+def graphite_build_disk_target(uuid, action=None):
+    """
+    """
+
+    switch_stat = {'write': graphite_build_disk_write_target,
+                   'read': graphite_build_disk_read_target,
+                  }
+
+
+    if not action:
+        target_uri = '%s' % (switch_stat['read'](uuid))
+        target_uri += '&%s' % (switch_stat['write'](uuid))
+    elif action == 'read' or action == 'write':
+        target_uri = '%s' % (switch_stat[action](uuid))
+    else:
+        log.error("No such action %s, returning both" % action)
+        target_uri = '%s' % (switch_stat['write'](uuid))
+        target_uri += '&%s' % (switch_stat['read'](uuid))
+
     return target_uri
 
 
@@ -856,7 +922,7 @@ def graphite_get_disk_stats(uri, uuid, time):
     #FIXME: minimize graphite queries -- This is unacceptable!
     #commenting out the other values -- not sure we actually need them
     #disk_types = ['disk_merged', 'disk_octets', 'disk_ops', 'disk_time' ]
-    disk_types = ['disk_ops']
+    disk_types = ['disk_octets']
     for disk_type in disk_types:
         
         target = 'derivative(sumSeries(%s.disk-*.%s.read))' % (vm_hostname, disk_type)
@@ -984,13 +1050,13 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
                 retval[target] = {'cores': 1, 'utilization': [0]}
         if target == 'disk': 
             if ret.has_key('disk-read'):
-                retval[target] = {'disks': 1, 'read': {'xvda1': {'disk_ops': ret['disk-read']}}}
+                retval[target] = {'disks': 1, 'read': {'xvda1': {'disk_octets': ret['disk-read']}}}
             else:
-                retval[target] = {'disks': 1, 'read': {'xvda1': {'disk_ops': [0]}}}
+                retval[target] = {'disks': 1, 'read': {'xvda1': {'disk_octets': [0]}}}
             if ret.has_key('disk-write'):
-                retval[target]['write'] = {'xvda1': {'disk_ops': ret['disk-write']}}
+                retval[target]['write'] = {'xvda1': {'disk_octets': ret['disk-write']}}
             else:
-                retval[target]['write'] = {'xvda1': {'disk_ops': [0]}}
+                retval[target]['write'] = {'xvda1': {'disk_octets': [0]}}
 
         if target == 'network': 
             if ret.has_key('net-recv'):

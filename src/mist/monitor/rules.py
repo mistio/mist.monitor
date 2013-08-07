@@ -16,11 +16,28 @@ from mist.monitor.stats import graphite_build_mem_target
 from mist.monitor.stats import graphite_build_load_target
 from mist.monitor.stats import graphite_build_net_target
 from mist.monitor.stats import graphite_build_disk_target
+from mist.monitor.stats import graphite_build_net_tx_target
+from mist.monitor.stats import graphite_build_disk_write_target
+from mist.monitor.stats import graphite_build_net_rx_target
+from mist.monitor.stats import graphite_build_disk_read_target
 from mist.monitor.stats import MACHINE_PREFIX
 
 log = getLogger('mist.monitor')
 
-metrics = ['cpu', 'ram', 'load', 'disk', 'network']
+# We now support network tx/rx and disk rd/wr rules. 
+# We just keep network and disk metrics to account 
+# for aggregate rules in the future.
+
+metrics = ['cpu',
+           'ram',
+           'load',
+           'disk',
+           'network',
+           'network-tx',
+           'network-rx',
+           'disk-read',
+           'disk-write'
+          ]
 
 REMINDER_LIST = [60, # 1min
                  5 * 60, # 5mins 
@@ -64,12 +81,14 @@ def build_alert_target(uuid, metric):
     """
 
     switch_stat = {'cpu': graphite_build_cpu_target,
-                   #FIXME we override this function to get
-                   # the percentage through graphite
                    'ram': graphite_build_mem_target_v2, 
                    'load': graphite_build_load_target,
                    'network': graphite_build_net_target,
-                   'disk': graphite_build_disk_target 
+                   'network-tx': graphite_build_net_tx_target,
+                   'network-rx': graphite_build_net_rx_target,
+                   'disk': graphite_build_disk_target,
+                   'disk-read': graphite_build_disk_read_target,
+                   'disk-write': graphite_build_disk_write_target,
                   }
 
     if metric not in metrics:
