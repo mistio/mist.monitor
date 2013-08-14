@@ -619,7 +619,7 @@ def graphite_build_net_tx_target(uuid):
 
     target = 'derivative(sumSeries(%s.interface*.if_octets*.tx))' % (vm_hostname)
     
-    target_uri = "target=alias(removeBelowValue(%s, 0),'net-send')" % (target) 
+    target_uri = "target=alias(transformNull(removeBelowValue(%s, 0),0),'net-send')" % (target) 
 
     return target_uri
 
@@ -632,7 +632,7 @@ def graphite_build_net_rx_target(uuid):
 
     target = 'derivative(sumSeries(%s.interface*.if_octets*.rx))' % (vm_hostname)
 
-    target_uri = "target=alias(removeBelowValue(%s, 0),'net-recv')" % (target) 
+    target_uri = "target=alias(transformNull(removeBelowValue(%s, 0), 0),'net-recv')" % (target) 
 
     return target_uri
 
@@ -669,7 +669,7 @@ def graphite_build_load_target(uuid):
     
     target = '%s.load.load.shortterm' % (vm_hostname)
     
-    target_uri = "target=alias(%s,'load')" % (target) 
+    target_uri = "target=alias(transformNull(%s, 0),'load')" % (target) 
 
     return target_uri
 
@@ -684,7 +684,7 @@ def graphite_build_mem_target_v2(uuid):
     target_total= 'sumSeries(%s.memory.memory-*)' % (vm_hostname)
     target_perc = 'asPercent(%s, %s)' % (target_used, target_total)
     
-    target_uri = "target=alias(%s,'mem')" % (target_perc) 
+    target_uri = "target=alias(transformNull(%s, 0),'mem')" % (target_perc) 
 
     return target_uri
 
@@ -716,7 +716,7 @@ def graphite_build_disk_read_target(uuid):
     disk_type = 'disk_octets'
     target = 'derivative(sumSeries(%s.disk-*.%s.read))' % (vm_hostname, disk_type)
         
-    target_uri = "target=alias(%s,'disk-read')" % (target) 
+    target_uri = "target=alias(transformNull(%s, 0),'disk-read')" % (target) 
 
     return target_uri
 
@@ -731,7 +731,7 @@ def graphite_build_disk_write_target(uuid):
     disk_type = 'disk_octets'
     target = 'derivative(sumSeries(%s.disk-*.%s.write))' % (vm_hostname, disk_type)
 
-    target_uri = "target=alias(%s,'disk-write')" % (target) 
+    target_uri = "target=alias(transformNull(%s, 0),'disk-write')" % (target) 
         
     return target_uri
 
@@ -779,7 +779,7 @@ def graphite_get_cpu_stats(uri, uuid, time):
     #Divide the first with the second sum (wo_idle_sum / total_sum)
     target = "divideSeries(%s,%s)" % (first_set, second_set)
     
-    complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time) 
+    complete_uri = "%s/render?target=transformNull(%s, 0)%s&format=json" % (uri, target, time) 
 
     list_data = graphite_issue_request(complete_uri)
 
