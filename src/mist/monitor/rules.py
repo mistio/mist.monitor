@@ -36,7 +36,7 @@ metrics = ['cpu',
            'network-tx',
            'network-rx',
            'disk-read',
-           'disk-write'
+           'disk-write',
           ]
 
 REMINDER_LIST = [60, # 1min
@@ -92,6 +92,7 @@ def build_alert_target(uuid, metric):
                   }
 
     if metric not in metrics:
+        log.error("%s not found in %s" % (metric, metrics))
         return 1
 
     target = switch_stat[metric](uuid)
@@ -99,6 +100,7 @@ def build_alert_target(uuid, metric):
 
     return ret_target
     
+
 def update_alert(alerts, rule_id, alert_target, metric, operator, value, time_to_wait):
     """
     """
@@ -258,7 +260,7 @@ def add_rule(json_rule):
             settings['reminder_list'] = reminder_list 
             settings['machine_id'] = machine_id
             settings['backend_id'] = backend_id 
-            print settings
+            #print settings
             #print reminder_list
             #FIXME: find a way to get the machine's IP, name and DNS name (see above)
             #if public_ips:
@@ -320,7 +322,7 @@ def remove_rule(request):
         settings = ymlfile.get('settings', None)
         alerts = remove_alert(alerts, params)
         ymlfile = {'alerts': alerts, 'settings': settings}
-        print len(alerts)
+        #print len(alerts)
         if len(alerts) == 1:
             os.remove(os.getcwd()+filename)
         f = open(os.getcwd()+filename, "w")

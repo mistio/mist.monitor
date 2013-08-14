@@ -619,7 +619,7 @@ def graphite_build_net_tx_target(uuid):
 
     target = 'derivative(sumSeries(%s.interface*.if_octets*.tx))' % (vm_hostname)
     
-    target_uri = "target=alias(%s,'net-send')" % (target) 
+    target_uri = "target=alias(removeBelowValue(%s, 0),'net-send')" % (target) 
 
     return target_uri
 
@@ -632,7 +632,7 @@ def graphite_build_net_rx_target(uuid):
 
     target = 'derivative(sumSeries(%s.interface*.if_octets*.rx))' % (vm_hostname)
 
-    target_uri = "target=alias(%s,'net-recv')" % (target) 
+    target_uri = "target=alias(removeBelowValue(%s, 0),'net-recv')" % (target) 
 
     return target_uri
 

@@ -159,6 +159,10 @@ def update_rules(request):
     core_port = core['port']
     try:
         params = request.json_body
+        metric = params.get('metric', None)
+        log.error(params)
+        if metric in ['network-tx', 'disk-write']:
+            params['value'] = float(params['value']) * 1000
         action = params.get('rule_action', None)
         params['host'] = host
         params['port'] = port
@@ -171,7 +175,8 @@ def update_rules(request):
         if ret:
             log.error('rule action failed, ret = %d' % ret)
             return Response('Bad Request', 400)
-    except:
+    except Exception as e:
+        log.warn('Error %s' % e)
         return Response('Bad Request', 400)
 
     log.debug('rule action %s, ret = %d' % (action, ret))
