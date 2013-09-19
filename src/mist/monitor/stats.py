@@ -606,7 +606,7 @@ def graphite_build_cpu_target(uuid):
     #Divide the first with the second sum (wo_idle_sum / total_sum)
     target = "divideSeries(%s,%s)" % (first_set, second_set)
     
-    target_uri = "target=alias(%s,'cpu')" % (target) 
+    target_uri = "target=alias(transformNull(%s, 0),'cpu')" % (target) 
 
     return target_uri 
 
@@ -1005,6 +1005,7 @@ def graphite_issue_massive_request(uri, nrstats):
 #        log.error("data is not returned correctly. Need a list, got %s" % ret)
 #        ret = []
 
+    log.debug("data from graphite= %s " % real_list_data)
     return ret
 
 def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
@@ -1117,6 +1118,7 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
        u'tx': [0.09384519690292271]}}}
     """
 
+    log.debug("return value (massive stats) %s" % retval)
     return retval
 
 def graphite_get_loadavg(host, port, uuid, start, step):
