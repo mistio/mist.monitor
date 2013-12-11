@@ -656,7 +656,8 @@ def graphite_build_net_rx_target(uuid):
 
     target = graphite_build_inner_net_rx_target(uuid)
 
-    target_uri = "target=alias(transformNull(removeBelowValue(%s, 0), 0),'net-recv')" % (target) 
+    target_all = 'summarize(%s, "STEPsecs", "avg")' % (target)
+    target_uri = "target=alias(transformNull(removeBelowValue(%s, 0), 0),'net-recv')" % (target_all) 
 
     return target_uri
 
@@ -789,7 +790,8 @@ def graphite_build_disk_write_target(uuid):
 
     target = graphite_build_inner_disk_write_target(uuid)
 
-    target_uri = "target=alias(transformNull(%s, 0),'disk-write')" % (target) 
+    target_all = 'summarize(%s, "STEPsecs", "avg")' % (target)
+    target_uri = "target=alias(transformNull(%s, 0),'disk-write')" % (target_all) 
         
     return target_uri
 
@@ -1071,8 +1073,8 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
     switch_stat = {'cpu': graphite_build_inner_cpu_target,
                    'memory': graphite_build_inner_mem_target_v2,
                    'load': graphite_build_inner_load_target,
-                   'network': graphite_build_inner_net_rx_target,
-                   'disk': graphite_build_inner_disk_read_target 
+                   'network': graphite_build_net_target,
+                   'disk': graphite_build_disk_target 
                   }
 
     uri = "http://%s:%d" %(host, port)
@@ -1088,11 +1090,15 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
     ret = {}
     retval = {}
 
+    step_str = str(step)
     massive_target = ""
     for target in expression:
         # FIXME: will incororate this for zooming in/out of a specific time
         # period, major TODO
-        iter_target = 'target=alias(summarize(%s, "%dsecs", "avg"), "%s")' % (switch_stat[target](uuid), step, target)
+        if target in ['disk', 'network']:
+            iter_target = '%s' % (switch_stat[target](uuid).replace('STEP', step_str))
+        else:
+            iter_target = 'target=alias(summarize(transformNull(%s, 0), "%dsecs", "avg"), "%s")' % (switch_stat[target](uuid), step, target)
         #iter_target = '%s' % (switch_stat[target](uuid))
         massive_target += iter_target + "&"
         print iter_target
@@ -1101,6 +1107,7 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
     print complete_uri
 
     ret = graphite_issue_massive_request(complete_uri, nrstats)
+    print ret
     
     for target in expression:
         if target == 'cpu': 
