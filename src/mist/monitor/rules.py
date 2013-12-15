@@ -97,6 +97,7 @@ def build_alert_target(uuid, metric):
 
     target = switch_stat[metric](uuid)
     ret_target = target.replace('target=','')
+    ret_target = "alias(%s, '%s')" % (ret_target, metric)
 
     return ret_target
     
