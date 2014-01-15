@@ -1050,15 +1050,14 @@ def graphite_issue_massive_request(uri, nrstats):
     for i in range(0, json_len):
         data = req.json()[i]['datapoints']
         data_len = len(data)
-        print data_len
         index = req.json()[i]['target']
-        print index
         real_list_data[index] = []
         #log.warn("%s %d %d" % (index, data_len, nrstats))
         real_list_data[index] = [j[0] for j in data]
         #real_list_data[index] = [j[0] if j[0].__class__ in [float,int] else 0.1 for j in data]
         if (len(real_list_data[index]) > 1):
             real_list_data[index] = real_list_data[index][:-1]
+            real_list_data[index] = real_list_data[index][1:]
         else:
             log.warn("not enough data to skip the first one :S")
 
@@ -1083,13 +1082,15 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
 
     uri = "http://%s:%d" %(host, port)
 
-    #FIXME: we ask for one more number in order to skip the first one returned.
-    #In the case of derivatives we get None and D3 chokes on this. 
-    time_interval = "&from=%s&until=%s" % (start - step, stop - step)
-    nrstats = (stop - start) / step
     INTERVAL = 10
     if step < INTERVAL:
         step = INTERVAL
+    #FIXME: we ask for one more number in order to skip the first one returned.
+    #In the case of derivatives we get None and D3 chokes on this. 
+    if stop - start == step:
+        start = start - step
+    time_interval = "&from=%s&until=%s" % (start - 2*step, stop - step)
+    nrstats = (stop - start) / step
 
     print "Start : %s" % start
     print "Stop: %s" % stop
@@ -1113,10 +1114,8 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
         #print iter_target
 
     complete_uri = "%s/render?%s%s&format=json" % (uri, massive_target, time_interval) 
-    print complete_uri
 
     ret = graphite_issue_massive_request(complete_uri, nrstats)
-    print ret
     
     for target in expression:
         if target == 'cpu': 
@@ -1164,7 +1163,6 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
             else:
                 retval[target] = [0]
 
-    print retval
     """
     {'cpu': {'cores': 1, 'utilization': ret['cpu']},
      'disk': {'disks': 1,
