@@ -15,6 +15,69 @@ from mist.monitoring import config
 log = logging.getLogger(__name__)
 
 
+class Condition(OODictMongoMemcache):
+
+    cond_id = StrField()
+
+    uuid = StrField()
+    rule_id = StrField()
+
+    metric = StrField()
+    operator = StrField()
+    value = StrField()
+    time_to_wait = IntField()
+
+    triggered = IntField()  # 0 means no
+    last_switch = FloatField()  # timestamp of last change of bool(triggered)
+
+    def __init__(self, _dict=None, mongo_client=None, memcache_client=None):
+        """Properly initialize OODictMongoMemcache for condition data."""
+        return super(Condition, self).__init__(
+            memcache_host=config.MEMCACHED_HOST,
+            mongo_uri=config.MONGO_URI,
+            mongo_db='mist',
+            mongo_coll='conditions',
+            mongo_id='cond_id',
+            mongo_client=mongo_client,
+            memcache_client=memcache_client,
+            _dict=_dict
+        )
+
+    def get_from_cond_id(self, cond_id):
+        """Populate self from db with data for conditon with specified id."""
+        self.get_from_field('cond_id', cond_id)
+
+    def get_machine(self):
+        """Returns a Machine instance this rule is associated with."""
+        # make sure mongo client is connected
+        self._get_mongo_coll()
+        # and reuse connection to initiate Machine instance
+        machine = Machine(_dict=None,
+                          mongo_client=self._mongo_client,
+                          memcache_client=self._memcache)
+        machine.get_from_uuid(self.uuid)
+        return machine
+
+    def __str__(self):
+        """Return a human readable string representation of this condition."""
+        if self.operator == 'lt':
+            operator = "less than"
+        elif self.operator == 'gt':
+            operator = "greater than"
+        else:
+            operator = "?"
+        return "%s %s %s for %s seconds" % (
+            self.metric, operator, self.value, self.time_to_wait
+        )
+
+
+def get_condition_from_cond_id(cond_id):
+    """Helper function that returns a Condition instance of this cond_id."""
+    condition = Condition()
+    condition.get_from_cond_id(cond_id)
+    return condition
+
+
 class Rule(OODict):
     """A rule object is mainly a set of pointers to conditions."""
     warning = StrField()
@@ -79,67 +142,3 @@ def get_all_machines(mongo_uri=None):
     cache = MemcacheClient(config.MEMCACHED_HOST)
     machines_cursor = conn['mist'].machines.find()
     return (Machine(machine_dict, conn, cache) for machine_dict in machines_cursor)
-
-
-
-class Condition(OODictMongoMemcache):
-
-    cond_id = StrField()
-
-    uuid = StrField()
-    rule_id = StrField()
-    
-    metric = StrField()
-    operator = StrField()
-    value = StrField()
-    time_to_wait = IntField()
-
-    triggered = IntField()  # 0 means no
-    last_switch = FloatField()  # timestamp of last change of bool(triggered)
-
-    def __init__(self, _dict=None, mongo_client=None, memcache_client=None):
-        """Properly initialize OODictMongoMemcache for condition data."""
-        return super(Condition, self).__init__(
-            memcache_host=config.MEMCACHED_HOST,
-            mongo_uri=config.MONGO_URI,
-            mongo_db='mist',
-            mongo_coll='conditions',
-            mongo_id='cond_id',
-            mongo_client=mongo_client,
-            memcache_client=memcache_client,
-            _dict=_dict
-        )
-
-    def get_from_cond_id(self, cond_id):
-        """Populate self from db with data for conditon with specified id."""
-        self.get_from_field('cond_id', cond_id)
-
-    def get_machine(self):
-        """Returns a Machine instance this rule is associated with."""
-        # make sure mongo client is connected
-        self._get_mongo_coll()
-        # and reuse connection to initiate Machine instance
-        machine = Machine(_dict=None,
-                          mongo_client=self._mongo_client,
-                          memcache_client=self._memcache)
-        machine.get_from_uuid(self.uuid)
-        return machine
-
-    def __str__(self):
-        """Return a human readable string representation of this condition."""
-        if self.operator == 'lt':
-            operator = "less than"
-        elif self.operator == 'gt':
-            operator = "greater than"
-        else:
-            operator = "?"
-        return "%s %s %s for %s seconds" % (
-            self.metric, operator, self.value, self.time_to_wait
-        )
-
-
-def get_condition_from_cond_id(cond_id):
-    """Helper function that returns a Condition instance of this cond_id."""
-    condition = Condition()
-    condition.get_from_cond_id(cond_id)
-    return condition

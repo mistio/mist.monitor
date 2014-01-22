@@ -1,11 +1,12 @@
-"""Routes and create the wsgi app"""
-from logging import getLogger
+"""Define routes and create the wsgi app"""
+
+import logging
 
 from pyramid.config import Configurator
 
 from mist.monitor.resources import Root
 
-log = getLogger('mist.monitor')
+log = logging.getLogger(__name__)
 
 
 def main(global_config, **settings):

@@ -1,4 +1,18 @@
-MONGO_URI="localhost:27022"
-MEMCACHED_HOST="localhost:11211"
+"""Parses user defined settings from settings.py in top level dir."""
 
-# will eventually parse settings from settings.py in the top level directory.
+import logging
+
+log = logging.getLogger(__name__)
+
+
+# Parse user defined settings from settings.py in the top level project dir
+settings = {}
+try:
+    execfile("settings.py", settings)
+except IOError:
+    log.warning("No settings.py file found.")
+except Exception as exc:
+    log.error("Error parsing settings py: %r", exc)
+
+CORE_URI = settings.get("CORE_URI", "http://localhost:6543")
+BACKEND_URI = settings.get("BACKEND_URI", "http://graphite.mist.io")

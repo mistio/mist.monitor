@@ -216,7 +216,7 @@ def add_rule(json_rule):
     graphite_uri = "http://%s:%d" % (host, port)
     core_host = params.get('core_host', None)
     core_port = params.get('core_port', 0)
-    if core_port == 80:
+    if core_port in [80, 6543]:
         protocol = "http://"
     elif core_port == 443:
         protocol = "https://"

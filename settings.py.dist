@@ -1,45 +1,5 @@
-"""Configure which monitoring backend to use to get stats from
+"""User defined settings"""
 
-3 possible options: mongo, graphite and dummy. Only mongo works right now.
+BACKEND_URI = 'http://graphite.mist.io'
 
-Mongo example::
-
-    BACKEND = {
-        'type': 'mongodb',
-        'host': 'localhost',
-        'port': 27022,
-        'dbname': 'collectd'
-    }
-
-Graphite example::
-
-    BACKEND = {
-        'type': 'graphite',
-        'host': 'experiment.unweb.me',
-        'port': 8080
-    }
-
-Dummy example::
-
-    BACKEND = {
-        'type': 'dummy'
-    }
-
-Add the core_uri as a configuration parameter
-
-    CORE_URI = {
-        'host': 'core-2.mist.io',
-        'port': 80,
-    }
-"""
-
-BACKEND = {
-    'type': 'graphite',
-    'host': 'graphite.mist.io',
-    'port': 80,
-}
-
-CORE_URI = {
-        'host': 'mist.io',
-        'port': 443,
-}
+CORE_URI = 'https://mist.io'
