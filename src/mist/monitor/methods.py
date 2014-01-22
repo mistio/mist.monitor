@@ -1,9 +1,7 @@
-
 import os
+import logging
 from subprocess import call
 from time import time
-
-from logging import getLogger
 
 from mist.monitor.stats import mongo_get_stats
 from mist.monitor.stats import graphite_get_stats, graphite_get_loadavg
@@ -16,7 +14,13 @@ from mist.monitor.model import get_machine_from_uuid
 from mist.monitor.model import get_condition_from_cond_id
 from mist.monitor.model import get_all_machines
 
-log = getLogger(__name__)
+from mist.monitor.exceptions import RequiredParameterMissingError
+from mist.monitor.exceptions import MachineNotFoundError
+from mist.monitor.exceptions import RuleNotFoundError
+from mist.monitor.exceptions import MachineExistsError
+
+
+log = logging.getLogger(__name__)
 
 
 def update_collectd_conf():
@@ -53,19 +57,16 @@ def update_collectd_conf():
     os.rename(imports_filepath + ".tmp", imports_filepath)
 
     # send a SIGHUP to collectd to reload configuration."""
-    try:
-        call(['/usr/bin/pkill', '-HUP', 'collectd'])
-    except Exception as e:
-        log.error('Error restarting collectd: %s' % e)
+    call(['/usr/bin/pkill', '-HUP', 'collectd'])
 
 
 def add_machine(uuid, password):
     """Adds machine to monitored list and inform collectd of new machine."""
 
     if not uuid:
-        raise RequiredParameterMissingError(uuid)
+        raise RequiredParameterMissingError("uuid")
     if not password:
-        raise RequiredParameterMissingError(password)
+        raise RequiredParameterMissingError("password")
 
     machine = get_machine_from_uuid(uuid)
     if machine:
@@ -101,11 +102,17 @@ def remove_machine(uuid):
     """Removes a machine from monitored list and from collectd's conf files."""
 
     if not uuid:
-        raise RequiredParameterMissingError(uuid)
+        raise RequiredParameterMissingError("uuid")
 
     machine = get_machine_from_uuid(uuid)
     if not machine:
         raise MachineNotFoundError(uuid)
+
+    for rule_id in machine.rules:
+        try:
+            remove_rule(uuid, rule_id)
+        except:
+            log.error("Error removing rule '%s'.", rule_id)
 
     machine.delete()
 

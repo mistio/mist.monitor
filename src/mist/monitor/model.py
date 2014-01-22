@@ -9,7 +9,10 @@ from mist.io.dal import OODict, FieldsList, make_field
 from mist.core.dal import FieldsDict  # escapes mongo dots
 from mist.core.dal import OODictMongoMemcache, OODictMongoMemcacheLock
 
-from mist.monitoring import config
+from mist.monitor import config
+
+from mist.monitor.exceptions import RuleNotFoundError
+from mist.monitor.exceptions import ConditionNotFoundError
 
 
 log = logging.getLogger(__name__)
@@ -125,7 +128,7 @@ class Machine(OODictMongoMemcacheLock):
         cond_id = self.rules[rule_id].warning
         condition.get_from_cond_id(cond_id)
         if not condition:
-            raise ConditionNotFoundError()
+            raise ConditionNotFoundError(cond_id)
         return condition
 
 

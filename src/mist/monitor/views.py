@@ -1,8 +1,7 @@
 import os
+import logging
 from subprocess import call
 from time import time
-
-from logging import getLogger
 
 from pyramid.view import view_config
 from pyramid.response import Response
@@ -18,8 +17,35 @@ from mist.monitor.model import get_all_machines
 from mist.monitor import methods
 from mist.monitor import config
 
-log = getLogger(__name__)
-OK = Response(200, "OK")
+from mist.monitor.exceptions import RequiredParameterMissingError
+from mist.monitor.exceptions import MachineNotFoundError
+
+
+log = logging.getLogger(__name__)
+OK = Response("OK", 200)
+
+
+@view_config(context=Exception)
+def exception_handler_mist(exc, request):
+    """Here we catch exceptions and transform them to proper http responses
+
+    This is a special pyramid view that gets triggered whenever an exception
+    is raised from any other view. It catches all exceptions exc where
+    isinstance(exc, context) is True.
+
+    """
+
+    # non-mist exceptions. that shouldn't happen! never!
+    if not isinstance(exc, exceptions.MistError):
+        trace = traceback.format_exc()
+        log.critical("Uncaught non-mist exception? WTF!\n%s", trace)
+        return Response("Internal Server Error", 500)
+
+    # mist exceptions are ok.
+    log.info("MistError: %r", exc)
+
+    # translate it to HTTP response based on http_code attribute
+    return Response(str(exc), exc.http_code)
 
 
 @view_config(route_name='machines', request_method='GET', renderer='json')
