@@ -88,3 +88,7 @@ class InternalServerError(MistError):
 class ServiceUnavailableError(MistError):
     msg = "Service unavailable"
     http_code = 503
+
+
+class GraphiteError(ServiceUnavailableError):
+    msg = "Error communicating with graphite"
