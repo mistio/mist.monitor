@@ -1,5 +1,5 @@
 """User defined settings"""
 
-BACKEND_URI = 'http://graphite.mist.io'
+#GRAPHITE_URI = 'http://graphite.mist.io'
 
-CORE_URI = 'https://mist.io'
+#CORE_URI = 'https://mist.io'

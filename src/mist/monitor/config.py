@@ -15,4 +15,4 @@ except Exception as exc:
     log.error("Error parsing settings py: %r", exc)
 
 CORE_URI = settings.get("CORE_URI", "http://localhost:6543")
-BACKEND_URI = settings.get("BACKEND_URI", "http://graphite.mist.io")
+GRAPHITE_URI = settings.get("GRAPHITE_URI", "http://graphite.mist.io")

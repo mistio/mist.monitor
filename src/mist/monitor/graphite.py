@@ -5,54 +5,58 @@ from mist.monitor.exceptions import GraphiteError
 
 
 MACHINE_PREFIX = "mist"
+MIN_INTERVAL = 10
 
 REQ_SESSION = None
 
 
-class GraphiteTarget(object):
+class GraphiteSeries(object):
     """Base graphite target class that defines an interface and provides
     convinience methods for subclasses to use."""
 
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, uuid)
-        self.head = "%s-%s" % (MACHINE_PREFIX, uuid)
+        self.uuid = uuid
 
-    @abc.abstractproperty
-    def alias(self):
-        """Each base class must define an 'alias' property."""
-
-    def _wrap_target(self, target):
-        """Prepare target and add the alias."""
-        return "target=alias(%s,'%s')" % (target, self.alias)
+    @property
+    def head(self):
+        return "%s-%s" % (MACHINE_PREFIX, uuid)
 
     @abc.abstractmethod
-    def get_series_target(self):
-        """Construct a graphite target string to retrieve time series."""
+    def get_targets(self):
+        """Return list of target strings."""
+        return []
 
-    def get_series(self):
+    @abc.abstractmethod
+    def get_series(self, start=0, stop=0):
         """Get time series from graphite."""
-        return self._graphite_request(self.get_series_target())
+        uri = self._construct_graphite_uri(self.get_targets(), start, stop)
+        data = self._graphite_request(uri)
+        return self._post_process_series(data)
 
-    @abc.abstractmethod
-    def get_value_target(self):
-        """Construct a graphite target string to retrieve single value."""
+    def _post_process_series(self, data):
+        return data
 
-    def get_value(self):
-        """Get single value from graphite."""
-        return self._graphite_request(self.get_value_target())
+    def _construct_graphite_uri(self, targets, start, stop):
+        targets_str = "&".join(["target=%s" % target for target in targets])
+        uri = "%s/render?%s&format=json" % (config.GRAPHITE_URI, targets_str)
+        if start:
+            uri += "&from=%s" % start
+        if stop:
+            uri += "&until=%s" % stop
+        return uri
 
-    def _graphite_request(self, target, use_session=False):
+    def _graphite_request(self, uri, use_session=False):
         """Issue a request to graphite."""
-
-        # FIXME: construct uri from target somehow
 
         global REQ_SESSION
 
         if use_session:
             log.debug("Using turbo http session")
             REQ_SESSION = requests.Session()
-            adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=100)
+            adapter = requests.adapters.HTTPAdapter(pool_connections=100,
+                                                    pool_maxsize=100)
             REQ_SESSION.mount('http://', adapter)
             REQ_SESSION.keep_alive = True
             req = REQ_SESSION
@@ -73,11 +77,55 @@ class GraphiteTarget(object):
         return {item['target']: item['datapoints'] for item in resp.json()}
 
 
-class CpuTarget(GraphiteTarget):
+class SimpleGraphiteSeries(GraphiteSeries):
+
+    alias = ""
+
+    def __init__(self, uuid, alias=""):
+        super(SimpleGraphiteSeries, self).__init__(uuid)
+        if alias:
+            self.alias = alias
+
+    @abc.abstractmethod
+    def get_inner_target(self):
+        pass
+
+    def get_targets(self):
+        target = self.get_inner_target()
+        if self.alias:
+            target = "alias(%s, '%s')" % (target, self.alias)
+        return [target]
+
+
+class CombinedGraphiteSeries(GraphiteSeries):
+    """Combines multiple GraphiteSeries instances together."""
+
+    def __init__(self, uuid, series_list=None):
+        """series should be a list of GraphiteSeries instances."""
+        super(CombinedGraphiteSeries, self).__init__(uuid)
+        for series in series_list:
+            if not isinstance(series, GraphiteSeries):
+                raise TypeError()
+        self.series_list = series_list
+
+    def get_targets(self):
+        targets = []
+        for series in self.series_list:
+            targets += series.get_targets()
+        return targets
+
+    def _post_process_series(self, data):
+        new_data = {}
+        for series in self.series_list:
+            new_data.update(series._post_process_series(data))
+        return new_data
+
+
+class CpuSeries(SimpleGraphiteSeries):
 
     alias = "cpu"
 
-    def get_series_target_unwrapped(self):
+    def get_inner_target(self):
         # Calculate the sum of all time measurements, excluding the "idle" one
         total_wo_idle_sum = 'sumSeries(exclude(%s.cpu-0.*,"idle"))' % (self.head)
         # Calculate the sum of all time measurements
@@ -89,217 +137,142 @@ class CpuTarget(GraphiteTarget):
         target = "divideSeries(%s,%s)" % (first_set, second_set)
         return target
 
-    def get_series_target(self):
-        return self._wrap_target(self.get_series_target_unwrapped())
-
-    def get_value_target(self):
-        raise NotImplementedError()
-
-    def get_series(self, time)
-
-        self._graphite_request(target)
-
-        #FIXME: curently aggregates utilization for all CPUs -- thus we pass 1 to D3
-        cpu_data = {'utilization': [], 'cores': 1}
-
-        target = self.get_series_target()
-
-        complete_uri = "%s/render?target=transformNull(%s, 0)%s&format=json" % (uri, target, time)
-
-        list_data = graphite_issue_request(complete_uri)
-
-        cpu_data['utilization'] = list_data
-
-        if not list_data:
-            log.warn("cpu utilization data empty :S")
-
-        ret = cpu_data
-
-        return ret
+    def _post_process_series(self, data):
+        return {
+            'cpu': {
+                'cores': 1,
+                'utilization': data['cpu'],
+            }
+        }
 
 
-class LoadTarget(GraphiteTarget):
+class LoadSeries(SimpleGraphiteSeries):
 
     alias = "load"
 
-    def get_series_target_unwrapped(self):
+    def get_inner_target(self):
         return "%s.load.load.shortterm" % (self.head)
 
-    def get_series_target(self):
-        return self._wrap_target(self.get_series_target_unwrapped())
 
-    def get_value_target(self):
-        raise NotImplementedError()
-
-        target = self.get_series_target()
-
-        load_data = []
-
-        complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time)
-
-        list_data = graphite_issue_request(complete_uri)
-
-        load_data = list_data
-
-        if not list_data:
-            log.warn("LOAD data empty :S")
-
-        ret = load_data
-        return ret
-
-
-class NetTarget(GraphiteTarget):
+class NetSeries(SimpleGraphiteSeries):
 
     alias = "net"
+    direction = "*"
+    iface = "*"
 
-    def __init__(self, uuid, iface="", direction=""):
-        self.iface = iface if iface == "eth0" else "*"
-        self.direction = direction if direction in ["rx", "tx"] else "*"
-        super(NetTarget, self).__init__(uuid)
+    def __init__(self, uuid, alias="", iface="", direction=""):
+        if iface:
+            self.iface = iface
+        if direction:
+            self.direction = direction
+        super(NetSeries, self).__init__(uuid, alias=alias)
 
-    def get_series_target_unwrapped(self):
+    def get_inner_target(self):
         return "derivative(sumSeries(%s.interface-%s.if_octets.%s))" % (
-            self.head, self.iface, self._direction
+            self.head, self.iface, self.direction
         )
 
-    def get_series_target(self):
-        return self._wrap_target(self.get_series_target_unwrapped())
 
-    def get_value_target(self):
-        target = self.get_series_target_unwrapped()
-        target = 'summarize(%s, "STEPsecs", "avg")' % (target)
-        target = "transformNull(removeBelowValue(%s, 0), 0)" % (target)
-        target = self._wrap_target(target)
-        return target
+class NetRxSeries(NetSeries):
+
+    alias = "net-rx"
+    direction = "rx"
 
 
-class NetRxTarget(NetTarget):
+class NetTxSeries(NetSeries):
 
-    alias = "net-send"
-
-    def __init__(self, uuid, iface=""):
-        super(NetRxTarget, self).__init__(uuid, iface, "rx")
+    alias = "net-tx"
+    direction = "rx"
 
 
-class NetTxTarget(NetTarget):
+class NetAllSeries(CombinedGraphiteSeries):
+    """NetAllSeries merges NetRxSeries and NetTxSeries."""
 
-    alias = "net-recv"
+    def __init__(self, uuid):
+        series_list = [NetRxSeries(uuid, iface='eth0'),
+                       NetTxSeries(uuid, iface='eth0')]
+        super(NetAllSeries, self).__init__(uuid, series_list)
 
-    def __init__(self, uuid, iface=""):
-        super(NetTxTarget, self).__init__(uuid, iface, "tx")
-
-
-class NetTarget(GraphiteTarget):
-    """NetTarget merges NetRxTarget and NetTxTarget."""
-
-    alias = "net"
-
-    def get_series_target(self):
-        net_rx = NetRxTarget(self.uuid)
-        rx_target = net_rx.wrap_target(net_rx.get_series_target())
-        net_tx = NetTxTarget(self.uuid)
-        tx_target = net_tx.wrap_target(net_tx.get_series_target())
-        target = "%s&%s" % (rx_target, tx_target)
-        return target
-
-    def get_value_target(self):
-        raise NotImplementedError()
-
-    def graphite_get_net_stats(uri, uuid, time):
-
-        #FIXME: curently works for a single interface
-        net_data = { 'eth0': { 'rx': [], 'tx': []} }
-
-        vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
-
-        #FIXME: we may want to return KB instead of just bytes -- if we do, we have to
-        #scale to 1/1024
-        #FIXME: find a way to handle rx and tx at the same time. Maybe we could get graphite
-        #to return a dict with 2 lists, 'tx' and 'rx'.
-        #target = 'scale(derivative(%s.interface-eth0.if_octets.tx), 0.00012207031250000000)'
-        target = 'derivative(%s.interface-eth0.if_octets.tx)' % (vm_hostname)
-
-        complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time)
-
-        list_data = graphite_issue_request(complete_uri)
-
-        net_data['eth0']['tx'] = list_data
-
-        if not list_data:
-            log.warn("NET TX data empty :S")
-
-        target = 'derivative(%s.interface-eth0.if_octets.rx)' % (vm_hostname)
-
-        complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time)
-
-        list_data = graphite_issue_request(complete_uri)
-
-        net_data['eth0']['rx'] = list_data
-
-        if not list_data:
-            log.warn("NET RX data empty :S")
-
-        ret = net_data
-        return ret
+    def _post_process_series(self, data):
+        return {
+            'eth0': {
+                'rx': data['net-rx'],
+                'tx': data['net-tx'],
+            }
+        }
 
 
-class MemTarget(GraphiteTarget):
+class MemSeries(SimpleGraphiteSeries):
 
     alias = "mem"
 
-    def get_series_target(self):
+    def get_inner_target(self):
         target_used = 'sumSeries(%s.memory.memory-{buffered,cached,used})' % (self.head)
         target_total= 'sumSeries(%s.memory.memory-*)' % (self.head)
         target_perc = 'asPercent(%s, %s)' % (target_used, target_total)
-
         return target_perc
 
-    def get_value_target(self):
-        raise NotImplementedError()
 
-    def graphite_get_mem_stats(uri, uuid, time):
+class DiskSeries(SimpleGraphiteSeries):
 
-        mem_data = {'total': 0, 'used': [] }
+    alias = "disk"
+    direction = "*"
 
-        vm_hostname = "%s-%s" %(MACHINE_PREFIX, uuid)
+    def __init__(self, uuid, alias="", direction=""):
+        if direction:
+            self.direction = direction
+        super(DiskSeries, self).__init__(uuid, alias=alias)
 
-        #FIXME: find a way to calculate the total memory without querying graphite!
-
-        target = 'scale(sumSeries(%s.memory.memory-*),0.00097656250000000000)' % (vm_hostname)
-
-        complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time)
-
-        list_data = graphite_issue_request(complete_uri)
-
-        if not list_data:
-            log.warn("MEM data empty :S")
-            return mem_data
-
-        mem_data['total'] = list_data[0]
-
-        target = 'scale(sumSeries(%s.memory.memory-{buffered,cached,used}),0.00097656250000000000)' % (vm_hostname)
-
-        complete_uri = "%s/render?target=%s%s&format=json" % (uri, target, time)
-
-        list_data = graphite_issue_request(complete_uri)
-
-        mem_data['used'] = list_data
-
-        if not list_data:
-            log.warn("MEM data empty :S")
-
-        ret = mem_data
-        return ret
+    def get_inner_target(self):
+        return "derivative(sumSeries(%s.disk-*.%s.%s))" % (
+            self.head, 'disk_octets', self.direction
+        )
 
 
-def make_complex_graphite_target(*args):
+class DiskReadSeries(DiskSeries):
 
-    class ComplexTarget(GraphiteTarget):
-        def get_series_target(self):
-            return "&".join([arg.get_series_target() for arg in args])
+    alias = "disk-read"
+    direction = "read"
 
-    for arg in args:
-        if not isinstance(arg, GraphiteTarget):
-            raise TypeError(arg)
 
-    return ComplexTarget()
+class DiskWriteSeries(DiskSeries):
+
+    alias = "disk-write"
+    direction = "write"
+
+
+class DiskAllSeries(CombinedGraphiteSeries):
+
+    def __init__(self, uuid):
+        series_list = [DiskReadSeries(uuid), DiskWriteSeries(uuid)]
+        super(DiskAllSeries, self).__init__(uuid, series_list)
+
+    def _post_process_series(self, data):
+        return {
+            'disk': {
+                'disks': 1,
+                'read': {
+                    'xvda1': {
+                        'disk_octets': data['disk-read'],
+                    }
+                },
+                'write': {
+                    'xvda1': {
+                        'disk_octets': data['disk-write'],
+                    }
+                },
+            }
+        }
+
+
+class AllSeries(CombinedGraphiteSeries):
+
+    def __init__(self, uuid):
+        series_list = [
+            CpuSeries(uuid),
+            MemSeries(uuid),
+            LoadSeries(uuid),
+            NetAllSeries(uuid),
+            DiskAllSeries(uuid),
+        ]
+        super(AllSeries, self).__init__(uuid, series_list)
