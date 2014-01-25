@@ -9,7 +9,9 @@ from time import time
 ## from mist.monitor.rules import add_rule
 ## from mist.monitor.rules import remove_rule
 
-from mist.monitor.model import Machine, Condition
+from mist.monitor.helpers import get_rand_token
+
+from mist.monitor.model import Machine, Condition, Rule
 from mist.monitor.model import get_machine_from_uuid
 from mist.monitor.model import get_condition_from_cond_id
 from mist.monitor.model import get_all_machines
@@ -91,7 +93,7 @@ def add_machine(uuid, password):
     </Chain>
     """ % {'uuid': uuid}
     rule_filepath = os.getcwd() + "/conf/collectd_%s.conf" % machine.uuid
-    with open(rule_file_path, "w") as f:
+    with open(rule_filepath, "w") as f:
         f.write(chain_rule)
 
     # add uuid/passwd in collectd conf and import chain rule
@@ -126,7 +128,7 @@ def remove_machine(uuid):
 def update_rule(uuid, rule_id, metric, operator, value, time_to_wait):
     """Add or edit a rule."""
 
-    machine = machine_from_uuid(uuid)
+    machine = get_machine_from_uuid(uuid)
     if not machine:
         raise MachineNotFoundError(uuid)
 
@@ -138,7 +140,7 @@ def update_rule(uuid, rule_id, metric, operator, value, time_to_wait):
     condition.operator = operator
     condition.value = value
     condition.time_to_wait = time_to_wait
-    condition.cond_id = get_rand_id()
+    condition.cond_id = get_rand_token()
     condition.create()
 
     with machine.lock_n_load():
