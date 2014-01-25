@@ -44,6 +44,8 @@ class GraphiteSeries(object):
     def _construct_graphite_uri(self, targets, start, stop):
         targets_str = "&".join(["target=%s" % target for target in targets])
         uri = "%s/render?%s&format=json" % (config.GRAPHITE_URI, targets_str)
+        start = int(start)
+        stop = int(stop)
         if start:
             uri += "&from=%s" % start
         if stop:
@@ -67,6 +69,7 @@ class GraphiteSeries(object):
             req = requests
 
         try:
+            log.info("Querying graphite uri: '%s'.", uri)
             resp = req.get(uri)
         except Exception as exc:
             log.error("Error sending request to graphite: %r", exc)
@@ -96,7 +99,7 @@ class SimpleGraphiteSeries(GraphiteSeries):
     def get_targets(self):
         target = self.get_inner_target()
         if self.alias:
-            target = "alias(%s, '%s')" % (target, self.alias)
+            target = "alias(%s,'%s')" % (target, self.alias)
         return [target]
 
 
