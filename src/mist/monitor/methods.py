@@ -3,11 +3,7 @@ import logging
 from subprocess import call
 from time import time
 
-## from mist.monitor.stats import mongo_get_stats
-## from mist.monitor.stats import graphite_get_stats, graphite_get_loadavg
-## from mist.monitor.stats import dummy_get_stats
-## from mist.monitor.rules import add_rule
-## from mist.monitor.rules import remove_rule
+from mist.monitor import graphite
 
 from mist.monitor.helpers import get_rand_token
 
@@ -62,7 +58,7 @@ def update_collectd_conf():
     call(['/usr/bin/pkill', '-HUP', 'collectd'])
 
 
-def add_machine(uuid, password):
+def add_machine(uuid, password, update_collectd=True):
     """Adds machine to monitored list and inform collectd of new machine."""
 
     if not uuid:
@@ -97,7 +93,8 @@ def add_machine(uuid, password):
         f.write(chain_rule)
 
     # add uuid/passwd in collectd conf and import chain rule
-    update_collectd_conf()
+    if update_collectd:
+        update_collectd_conf()
 
 
 def remove_machine(uuid):
@@ -177,52 +174,55 @@ def remove_rule(uuid, rule_id):
         machine.save()
 
 
-def get_stats(request):
+def get_stats(uuid, metrics=None, start=0, stop=0):
+    allowed_targets = {
+        'cpu': graphite.CpuSeries,
+        'load': graphite.LoadSeries,
+        'memory': graphite.MemSeries,
+        'disk': graphite.DiskAllSeries,
+        'network': graphite.NetAllSeries,
+    }
+    series_list = []
+    for metric in metrics:
+        if metric not in allowed_targets:
+            raise BadRequestError("metric '%s' not allowed" % metric)
+        series_list.append(allowed_targets[metric](uuid))
+    series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
+    return series.get_series(start, stop)
+
+
+def reset_hard(data, key):
+    """Reset mist.monitor data.
+
+    This will erase all previous data, save the supplied data and restart
+    collectd. It will not affect monitoring data, but will reset all machines
+    with enabled monitoring, their passwords, rules etc.
+
+    data is expected to be a dict of uuids mapping to machine dicts.
+    Each machine needs to have a collectd_password key.
+    Optionally it can contain a rule_key which should be a dict with rule_id's
+    as keys and rule dicts as values. A rule_dict nees to have operator,
+    metric, value, time_to_wait etc.
+
     """
-    Returns all stats for a machine, the client will draw them.
-    """
-    uuid = request.matchdict['machine']
 
-    if not uuid:
-        log.error("cannot find uuid %s" % uuid)
-        return Response('Bad Request', 400)
+    # drop databases
+    machine = Machine()._get_mongo_coll().drop()
+    condition = Condition()._get_mongo_coll().drop()
 
-    allowed_expression = ['cpu', 'load', 'memory', 'disk', 'network']
+    # recreate machines and rules
+    for uuid, machine_dict in data.iteritems():
+        add_machine(uuid, machine_dict['collectd_password'],
+                    update_collectd=False)
+        for rule_id, rule_dict in machine_dict.get('rules', {}).iteritems():
+            update_rule(
+                uuid=uuid,
+                rule_id=rule_id,
+                metric=rule_dict['metric'],
+                operator=rule_dict['operator'],
+                value=rule_dict['value'],
+                time_to_wait=rule_dict['time_to_wait'],
+            )
 
-    expression = request.params.get('expression',
-                                    ['cpu', 'load', 'memory', 'disk', 'network'])
-    if expression.__class__ in [str,unicode]:
-        #expression = [expression]
-        expression = expression.split(',')
-
-    for target in expression:
-        if target not in allowed_expression:
-            log.error("expression error '%s'" % target)
-            return Response('Bad Request', 400)
-
-    # step comes from the client in millisecs, convert it to secs
-    step = int(request.params.get('step', 10000))
-    if (step >= 5000):
-        step = int(step/1000)
-    elif step == 0:
-        log.warn("We got step == 0, maybe the client is broken ;S, using default")
-        step = 60
-    else:
-        log.warn("We got step < 1000, maybe the client meant seconds ;-)")
-
-    stop = int(request.params.get('stop', int(time())))
-    start = int(request.params.get('start', stop - step))
-
-    stats = {}
-    backend = request.registry.settings['backend']
-    if backend['type'] == 'graphite':
-        host = backend['host']
-        port = backend['port']
-        stats = graphite_get_stats(host, port, uuid, expression, start, stop, step)
-    elif backend['type'] == 'dummy':
-        stats = dummy_get_stats(expression, start, stop, step)
-    else:
-        log.error('Requested invalid monitoring backend: %s' % backend)
-        return Response('Service unavailable', 503)
-
-    return stats
+    # update collectd's conf and reload it
+    update_collectd_conf()

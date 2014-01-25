@@ -7,3 +7,8 @@
 #MEMCACHED_URI = ["localhost:11211"]
 
 #MONGO_URI = "localhost:27022"
+
+# Reset key is used to reset monitor's data. It needs to be set to a non empty
+# string and sent along with a reset http request from core. Under normal
+# circumstances it should be left blank for security reasons.
+#RESET_KEY = ""

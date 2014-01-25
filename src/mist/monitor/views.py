@@ -6,19 +6,16 @@ from time import time
 from pyramid.view import view_config
 from pyramid.response import Response
 
-## from mist.monitor.stats import mongo_get_stats
-## from mist.monitor.stats import graphite_get_stats, graphite_get_loadavg
-## from mist.monitor.stats import dummy_get_stats
-## from mist.monitor.rules import add_rule
-## from mist.monitor.rules import remove_rule
-
-from mist.monitor import methods
 from mist.monitor import config
+from mist.monitor import methods
+from mist.monitor import graphite
 
 from mist.monitor.model import get_all_machines
 
 from mist.monitor.exceptions import RequiredParameterMissingError
 from mist.monitor.exceptions import MachineNotFoundError
+from mist.monitor.exceptions import ForbiddenError
+from mist.monitor.exceptions import UnauthorizedError
 
 
 log = logging.getLogger(__name__)
@@ -113,51 +110,32 @@ def update_rules(request):
 
 @view_config(route_name='stats', request_method='GET', renderer='json')
 def get_stats(request):
-    """
-    Returns all stats for a machine, the client will draw them.
-    """
+    """Returns all stats for a machine, the client will draw them."""
+
     uuid = request.matchdict['machine']
+    params = request.params
+    allowed_targets = ['cpu', 'load', 'memory', 'disk', 'network']
+    expression = params.get('expression',
+                            ['cpu', 'load', 'memory', 'disk', 'network'])
+    start = int(params.get('start', 0))
+    stop = int(params.get('stop', 0))
 
-    if not uuid:
-        log.error("cannot find uuid %s" % uuid)
-        return Response('Bad Request', 400)
-
-    allowed_expression = ['cpu', 'load', 'memory', 'disk', 'network']
-
-    expression = request.params.get('expression',
-                                    ['cpu', 'load', 'memory', 'disk', 'network'])
-    if expression.__class__ in [str,unicode]:
-        #expression = [expression]
+    if isinstance(expression, basestring):
         expression = expression.split(',')
-
     for target in expression:
-        if target not in allowed_expression:
-            log.error("expression error '%s'" % target)
-            return Response('Bad Request', 400)
+        if target not in allowed_targets:
+            raise BadRequestError("Bad target '%.s'" % target)
 
-    # step comes from the client in millisecs, convert it to secs
-    step = int(request.params.get('step', 10000))
-    if (step >= 5000):
-        step = int(step/1000)
-    elif step == 0:
-        log.warn("We got step == 0, maybe the client is broken ;S, using default")
-        step = 60
-    else:
-        log.warn("We got step < 1000, maybe the client meant seconds ;-)")
+    return methods.get_stats(uuid, expression, start, stop)
 
-    stop = int(request.params.get('stop', int(time())))
-    start = int(request.params.get('start', stop - step))
 
-    stats = {}
-    backend = request.registry.settings['backend']
-    if backend['type'] == 'graphite':
-        host = backend['host']
-        port = backend['port']
-        stats = graphite_get_stats(host, port, uuid, expression, start, stop, step)
-    elif backend['type'] == 'dummy':
-        stats = dummy_get_stats(expression, start, stop, step)
-    else:
-        log.error('Requested invalid monitoring backend: %s' % backend)
-        return Response('Service unavailable', 503)
-
-    return stats
+@view_config(route_name='reset', request_method='PUT')
+def reset_hard(request):
+    params = request.json_body
+    key, data = params.get(key), params.get(data, {})
+    if not config.RESET_KEY:
+        raise ForbiddenError("Reset functionality not enabled.")
+    if key != config.RESET_KEY:
+        raise UnauthorizedError("Wrong reset key provided.")
+    methods.reset_hard(params['data'])
+    return OK
