@@ -1,5 +1,6 @@
 import os
 import logging
+import traceback
 from subprocess import call
 from time import time
 
@@ -12,6 +13,7 @@ from mist.monitor import graphite
 
 from mist.monitor.model import get_all_machines
 
+from mist.monitor.exceptions import MistError
 from mist.monitor.exceptions import RequiredParameterMissingError
 from mist.monitor.exceptions import MachineNotFoundError
 from mist.monitor.exceptions import ForbiddenError
@@ -33,7 +35,7 @@ def exception_handler_mist(exc, request):
     """
 
     # non-mist exceptions. that shouldn't happen! never!
-    if not isinstance(exc, exceptions.MistError):
+    if not isinstance(exc, MistError):
         trace = traceback.format_exc()
         log.critical("Uncaught non-mist exception? WTF!\n%s", trace)
         return Response("Internal Server Error", 500)
@@ -132,7 +134,7 @@ def get_stats(request):
 @view_config(route_name='reset', request_method='PUT')
 def reset_hard(request):
     params = request.json_body
-    key, data = params.get(key), params.get(data, {})
+    key, data = params.get('key'), params.get('data', {})
     if not config.RESET_KEY:
         raise ForbiddenError("Reset functionality not enabled.")
     if key != config.RESET_KEY:

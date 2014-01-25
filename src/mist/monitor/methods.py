@@ -191,7 +191,7 @@ def get_stats(uuid, metrics=None, start=0, stop=0):
     return series.get_series(start, stop)
 
 
-def reset_hard(data, key):
+def reset_hard(data):
     """Reset mist.monitor data.
 
     This will erase all previous data, save the supplied data and restart
@@ -207,8 +207,11 @@ def reset_hard(data, key):
     """
 
     # drop databases
-    machine = Machine()._get_mongo_coll().drop()
-    condition = Condition()._get_mongo_coll().drop()
+    Machine()._get_mongo_coll().drop()
+    Condition()._get_mongo_coll().drop()
+
+    # flush memcache
+    Machine()._memcache.flush_all()
 
     # recreate machines and rules
     for uuid, machine_dict in data.iteritems():
