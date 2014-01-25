@@ -1,6 +1,8 @@
 import abc
+import logging
 import requests
 
+from mist.monitor import config
 from mist.monitor.exceptions import GraphiteError
 
 
@@ -9,6 +11,8 @@ MIN_INTERVAL = 10
 
 REQ_SESSION = None
 
+log = logging.getLogger(__name__)
+
 
 class GraphiteSeries(object):
     """Base graphite target class that defines an interface and provides
@@ -16,19 +20,18 @@ class GraphiteSeries(object):
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, uuid)
+    def __init__(self, uuid):
         self.uuid = uuid
 
     @property
     def head(self):
-        return "%s-%s" % (MACHINE_PREFIX, uuid)
+        return "%s-%s" % (MACHINE_PREFIX, self.uuid)
 
     @abc.abstractmethod
     def get_targets(self):
         """Return list of target strings."""
         return []
 
-    @abc.abstractmethod
     def get_series(self, start=0, stop=0):
         """Get time series from graphite."""
         uri = self._construct_graphite_uri(self.get_targets(), start, stop)

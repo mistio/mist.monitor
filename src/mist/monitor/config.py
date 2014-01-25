@@ -16,3 +16,5 @@ except Exception as exc:
 
 CORE_URI = settings.get("CORE_URI", "http://localhost:6543")
 GRAPHITE_URI = settings.get("GRAPHITE_URI", "http://graphite.mist.io")
+MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
+MONGO_URI = settings.get("MONGO_URI", "localhost:27022")

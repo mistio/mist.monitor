@@ -1,5 +1,9 @@
 """User defined settings"""
 
-#GRAPHITE_URI = 'http://graphite.mist.io'
+#GRAPHITE_URI = "http://graphite.mist.io"
 
-#CORE_URI = 'https://mist.io'
+#CORE_URI = "https://mist.io"
+
+#MEMCACHED_URI = ["localhost:11211"]
+
+#MONGO_URI = "localhost:27022"

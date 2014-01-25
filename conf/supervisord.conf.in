@@ -51,3 +51,11 @@ process_name = alert
 directory = ${buildout:directory}
 priority = 40
 redirect_stderr = false
+
+[program:memcache]
+command = ${buildout:directory}/bin/memcached  -l 127.0.0.1 
+process_name = memcache
+directory = ${buildout:directory}/bin
+priority = 25
+redirect_stderr = false
+

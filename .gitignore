@@ -25,3 +25,4 @@ src/mist.io/
 src/mist.core/
 src/mist.alert/
 settings.py
+build/

@@ -6,16 +6,16 @@ from time import time
 from pyramid.view import view_config
 from pyramid.response import Response
 
-from mist.monitor.stats import mongo_get_stats
-from mist.monitor.stats import graphite_get_stats, graphite_get_loadavg
-from mist.monitor.stats import dummy_get_stats
-from mist.monitor.rules import add_rule
-from mist.monitor.rules import remove_rule
-
-from mist.monitor.model import get_all_machines
+## from mist.monitor.stats import mongo_get_stats
+## from mist.monitor.stats import graphite_get_stats, graphite_get_loadavg
+## from mist.monitor.stats import dummy_get_stats
+## from mist.monitor.rules import add_rule
+## from mist.monitor.rules import remove_rule
 
 from mist.monitor import methods
 from mist.monitor import config
+
+from mist.monitor.model import get_all_machines
 
 from mist.monitor.exceptions import RequiredParameterMissingError
 from mist.monitor.exceptions import MachineNotFoundError

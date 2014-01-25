@@ -3,11 +3,11 @@ import logging
 from subprocess import call
 from time import time
 
-from mist.monitor.stats import mongo_get_stats
-from mist.monitor.stats import graphite_get_stats, graphite_get_loadavg
-from mist.monitor.stats import dummy_get_stats
-from mist.monitor.rules import add_rule
-from mist.monitor.rules import remove_rule
+## from mist.monitor.stats import mongo_get_stats
+## from mist.monitor.stats import graphite_get_stats, graphite_get_loadavg
+## from mist.monitor.stats import dummy_get_stats
+## from mist.monitor.rules import add_rule
+## from mist.monitor.rules import remove_rule
 
 from mist.monitor.model import Machine, Condition
 from mist.monitor.model import get_machine_from_uuid
@@ -175,7 +175,6 @@ def remove_rule(uuid, rule_id):
         machine.save()
 
 
-@view_config(route_name='stats', request_method='GET', renderer='json')
 def get_stats(request):
     """
     Returns all stats for a machine, the client will draw them.

@@ -11,13 +11,6 @@ log = logging.getLogger(__name__)
 
 def main(global_config, **settings):
 
-    # Import settings from settings.py
-    user_config = {}
-    execfile(global_config['here'] + '/settings.py', user_config)
-
-    settings['backend'] = user_config['BACKEND']
-    settings['core'] = user_config['CORE_URI']
-
     config = Configurator(root_factory=Root, settings=settings)
     config.scan()
 
