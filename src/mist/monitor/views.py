@@ -18,6 +18,7 @@ from mist.monitor.exceptions import RequiredParameterMissingError
 from mist.monitor.exceptions import MachineNotFoundError
 from mist.monitor.exceptions import ForbiddenError
 from mist.monitor.exceptions import UnauthorizedError
+from mist.monitor.exceptions import BadRequestError
 
 
 log = logging.getLogger(__name__)
@@ -54,7 +55,9 @@ def list_machines(request):
     Returns a dict with uuid's as keys and machine dicts as values.
 
     """
-    return {machine.uuid: machine.as_dict() for machine in get_all_machines()}
+    return {machine.uuid: {'rules': [rule_id]}
+            for machine in get_all_machines()
+            for rule_id in machine.rules}
 
 
 @view_config(route_name='machines', request_method='PUT')
@@ -126,7 +129,7 @@ def get_stats(request):
         expression = expression.split(',')
     for target in expression:
         if target not in allowed_targets:
-            raise BadRequestError("Bad target '%.s'" % target)
+            raise BadRequestError("Bad target '%s'" % target)
 
     return methods.get_stats(uuid, expression, start, stop)
 
