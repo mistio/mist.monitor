@@ -93,7 +93,9 @@ class GraphiteSeries(object):
 
 class SimpleGraphiteSeries(GraphiteSeries):
 
-    alias = ""
+    @abc.abstractproperty
+    def alias(self):
+        return ""
 
     def __init__(self, uuid, alias=""):
         super(SimpleGraphiteSeries, self).__init__(uuid)
@@ -105,11 +107,16 @@ class SimpleGraphiteSeries(GraphiteSeries):
         pass
 
     def get_targets(self):
-        target = self.get_inner_target()
-        if self.alias:
-            target = "alias(%s,'%s')" % (target, self.alias)
+        target = "alias(%s,'%s')" % (self.get_inner_target(), self.alias)
         return [target]
 
+    def _post_process_series(self, data):
+        """Only parse relevant data."""
+        for item in data:
+            if item['target'] == self.alias:
+                return super(SimpleGraphiteSeries, self)._post_process_series(
+                    item
+                )
 
 class CombinedGraphiteSeries(GraphiteSeries):
     """Combines multiple GraphiteSeries instances together."""
