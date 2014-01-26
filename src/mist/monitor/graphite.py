@@ -39,7 +39,15 @@ class GraphiteSeries(object):
         return self._post_process_series(data)
 
     def _post_process_series(self, data):
-        return data
+        """Change to (timestamp, value) pairs and strip null."""
+
+        new_data = {}
+        for item in data:
+            target = item['target']
+            new_data[target] = [(timestamp, value)
+                                for value, timestamp in item['datapoints']
+                                if value is not None]
+        return new_data
 
     def _construct_graphite_uri(self, targets, start, stop):
         targets_str = "&".join(["target=%s" % target for target in targets])
@@ -80,7 +88,7 @@ class GraphiteSeries(object):
                       resp.status_code, resp.text)
             raise GraphiteError()
 
-        return {item['target']: item['datapoints'] for item in resp.json()}
+        return resp.json()
 
 
 class SimpleGraphiteSeries(GraphiteSeries):
