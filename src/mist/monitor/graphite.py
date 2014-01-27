@@ -44,7 +44,7 @@ class GraphiteSeries(object):
         new_data = {}
         for item in data:
             target = item['target']
-            new_data[target] = [(timestamp, value)
+            new_data[target] = [value    #(timestamp, value)
                                 for value, timestamp in item['datapoints']
                                 if value is not None]
         return new_data
@@ -218,16 +218,18 @@ class NetAllSeries(CombinedGraphiteSeries):
     def _post_process_series(self, data):
         data = super(NetAllSeries, self)._post_process_series(data)
         return {
-            'eth0': {
-                'rx': data['net-rx'],
-                'tx': data['net-tx'],
+            'network': {
+                'eth0': {
+                    'rx': data['net-rx'],
+                    'tx': data['net-tx'],
+                }
             }
         }
 
 
 class MemSeries(SimpleGraphiteSeries):
 
-    alias = "mem"
+    alias = "memory"
 
     def get_inner_target(self):
         target_used = 'sumSeries(%s.memory.memory-{buffered,cached,used})' % (self.head)

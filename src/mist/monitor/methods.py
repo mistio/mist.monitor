@@ -148,8 +148,8 @@ def update_rule(uuid, rule_id, metric, operator, value, time_to_wait):
         rule = machine.rules[rule_id]
         # if rule had an associated condition, remove it
         if rule.warning:
-            old_condition = machine.get_condition(rule.warning)
-            old_condition.remove()
+            old_condition = machine.get_condition(rule_id)
+            old_condition.delete()
         # associate new condition with rule
         rule.warning = condition.cond_id
         machine.save()
@@ -158,7 +158,7 @@ def update_rule(uuid, rule_id, metric, operator, value, time_to_wait):
 def remove_rule(uuid, rule_id):
     """Remove a rule from a machine (along with its associated condition)."""
 
-    machine = machine_from_uuid(uuid)
+    machine = get_machine_from_uuid(uuid)
     if not machine:
         raise MachineNotFoundError(uuid)
     with machine.lock_n_load():
@@ -167,7 +167,7 @@ def remove_rule(uuid, rule_id):
 
         # delete associated condition
         condition = machine.get_condition(rule_id)
-        condition.remove()
+        condition.delete()
 
         # delete rule
         del machine.rules[rule_id]
