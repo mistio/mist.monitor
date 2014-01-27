@@ -115,7 +115,7 @@ class SimpleGraphiteSeries(GraphiteSeries):
         for item in data:
             if item['target'] == self.alias:
                 return super(SimpleGraphiteSeries, self)._post_process_series(
-                    item
+                    [item]
                 )
 
 class CombinedGraphiteSeries(GraphiteSeries):
@@ -159,6 +159,7 @@ class CpuSeries(SimpleGraphiteSeries):
         return target
 
     def _post_process_series(self, data):
+        data = super(CpuSeries, self)._post_process_series(data)
         return {
             'cpu': {
                 'cores': 1,
@@ -215,6 +216,7 @@ class NetAllSeries(CombinedGraphiteSeries):
         super(NetAllSeries, self).__init__(uuid, series_list)
 
     def _post_process_series(self, data):
+        data = super(NetAllSeries, self)._post_process_series(data)
         return {
             'eth0': {
                 'rx': data['net-rx'],
@@ -269,6 +271,7 @@ class DiskAllSeries(CombinedGraphiteSeries):
         super(DiskAllSeries, self).__init__(uuid, series_list)
 
     def _post_process_series(self, data):
+        data = super(DiskAllSeries, self)._post_process_series(data)
         return {
             'disk': {
                 'disks': 1,
