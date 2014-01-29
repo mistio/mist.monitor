@@ -2,6 +2,8 @@ import abc
 import logging
 import requests
 
+import numpy
+
 from mist.monitor import config
 from mist.monitor.exceptions import GraphiteError
 
@@ -14,7 +16,7 @@ REQ_SESSION = None
 log = logging.getLogger(__name__)
 
 
-class GraphiteSeries(object):
+class BaseGraphiteSeries(object):
     """Base graphite target class that defines an interface and provides
     convinience methods for subclasses to use."""
 
@@ -91,14 +93,19 @@ class GraphiteSeries(object):
         return resp.json()
 
 
-class SimpleGraphiteSeries(GraphiteSeries):
+class SingleGraphiteSeries(BaseGraphiteSeries):
 
     @abc.abstractproperty
     def alias(self):
         return ""
 
+    @abc.abstractproperty
+    def reduce_function(self):
+        """Must return a string in ['sum', 'avg', 'max', 'min', 'last']"""
+        return ""
+
     def __init__(self, uuid, alias=""):
-        super(SimpleGraphiteSeries, self).__init__(uuid)
+        super(SingleGraphiteSeries, self).__init__(uuid)
         if alias:
             self.alias = alias
 
@@ -114,19 +121,39 @@ class SimpleGraphiteSeries(GraphiteSeries):
         """Only parse relevant data."""
         for item in data:
             if item['target'] == self.alias:
-                return super(SimpleGraphiteSeries, self)._post_process_series(
+                return super(SingleGraphiteSeries, self)._post_process_series(
                     [item]
                 )
+        return {}
 
-class CombinedGraphiteSeries(GraphiteSeries):
+    def _reduce_datapoints(self, datapoints):
+        # strip nulls
+        # datapoints = [point for point in datapoints if point is not None]
+        if not datapoints:
+            return None
+        if self.reduce_function == 'avg':
+            return numpy.median(datapoints)
+        elif self.reduce_function == 'sum':
+            return numpy.sum(datapoints)
+        else:
+            return None
+
+    def get_value(self, start=0, stop=0):
+        data = self.get_series(start, stop)
+        datapoints = data[self.alias]
+        return self._reduce_datapoints(datapoints)
+
+
+class CombinedGraphiteSeries(BaseGraphiteSeries):
     """Combines multiple GraphiteSeries instances together."""
 
     def __init__(self, uuid, series_list=None):
         """series should be a list of GraphiteSeries instances."""
         super(CombinedGraphiteSeries, self).__init__(uuid)
         for series in series_list:
-            if not isinstance(series, GraphiteSeries):
-                raise TypeError()
+            if not isinstance(series, BaseGraphiteSeries):
+                raise TypeError("%r is not instance of "
+                                "BaseGraphiteSeries." % series)
         self.series_list = series_list
 
     def get_targets(self):
@@ -142,9 +169,10 @@ class CombinedGraphiteSeries(GraphiteSeries):
         return new_data
 
 
-class CpuSeries(SimpleGraphiteSeries):
+class CpuSeries(SingleGraphiteSeries):
 
     alias = "cpu"
+    reduce_function = "avg"
 
     def get_inner_target(self):
         # Calculate the sum of all time measurements, excluding the "idle" one
@@ -167,18 +195,25 @@ class CpuSeries(SimpleGraphiteSeries):
             }
         }
 
+    def get_value(self, start=0, stop=0):
+        data = self.get_series(start, stop)
+        datapoints = data[self.alias]['utilization']
+        return self._reduce_datapoints(datapoints)
 
-class LoadSeries(SimpleGraphiteSeries):
+
+class LoadSeries(SingleGraphiteSeries):
 
     alias = "load"
+    reduce_function = "avg"
 
     def get_inner_target(self):
         return "%s.load.load.shortterm" % (self.head)
 
 
-class NetSeries(SimpleGraphiteSeries):
+class NetSeries(SingleGraphiteSeries):
 
     alias = "net"
+    reduce_function = "avg"
     direction = "*"
     iface = "*"
 
@@ -227,9 +262,10 @@ class NetAllSeries(CombinedGraphiteSeries):
         }
 
 
-class MemSeries(SimpleGraphiteSeries):
+class MemSeries(SingleGraphiteSeries):
 
     alias = "memory"
+    reduce_function = "avg"
 
     def get_inner_target(self):
         target_used = 'sumSeries(%s.memory.memory-{buffered,cached,used})' % (self.head)
@@ -238,9 +274,10 @@ class MemSeries(SimpleGraphiteSeries):
         return target_perc
 
 
-class DiskSeries(SimpleGraphiteSeries):
+class DiskSeries(SingleGraphiteSeries):
 
     alias = "disk"
+    reduce_function = "avg"
     direction = "*"
 
     def __init__(self, uuid, alias="", direction=""):

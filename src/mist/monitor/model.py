@@ -30,8 +30,10 @@ class Condition(OODictMongoMemcache):
     value = StrField()
     time_to_wait = IntField()
 
-    triggered = IntField()  # 0 means no
-    last_switch = FloatField()  # timestamp of last change of bool(triggered)
+    state = BoolField()
+    state_since = FloatField()
+
+    notification_level = IntField()
 
     def __init__(self, _dict=None, mongo_client=None, memcache_client=None):
         """Properly initialize OODictMongoMemcache for condition data."""
@@ -130,6 +132,13 @@ class Machine(OODictMongoMemcacheLock):
         if not condition:
             raise ConditionNotFoundError(cond_id)
         return condition
+
+    def __str__(self):
+        """A human readable represantation of a machine with monitoring."""
+        msg = "Machine '%s' (%d rules)" % (self.uuid, len(self.rules))
+        for rule_id in self.rules:
+            msg += "\n - %s" % self.get_condition(rule_id)
+        return msg
 
 
 def get_machine_from_uuid(uuid):
