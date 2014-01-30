@@ -12,6 +12,8 @@ from mist.monitor.graphite import MemSeries
 from mist.monitor.graphite import DiskWriteSeries
 from mist.monitor.graphite import NetTxSeries
 
+from mist.monitor.exceptions import ConditionNotFoundError
+
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -115,14 +117,18 @@ def check_condition(condition):
 
 
 def main():
-    conditions = (machine.get_condition(rule_id)
-                  for machine in get_all_machines()
-                  for rule_id in machine.rules)
-    for condition in conditions:
-        try:
-            check_condition(condition)
-        except Exception as exc:
-            log.error(" ! Error %r", exc)
+    for machine in get_all_machines():
+        for rule_id in machine.rules:
+            try:
+                condition = machine.get_condition(rule_id)
+            except ConditionNotFoundError:
+                log.warning("! Condition not found, probably rule just got "
+                            "updated. Will check on next run.")
+                continue
+            try:
+                check_condition(condition)
+            except Exception as exc:
+                log.error(" ! Error %r", exc)
 
 
 if __name__ == "__main__":
