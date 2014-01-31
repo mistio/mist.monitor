@@ -24,3 +24,4 @@ src/whisper/
 src/mist.alert/
 settings.py
 build/
+*.swp

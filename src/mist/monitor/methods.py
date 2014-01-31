@@ -96,6 +96,9 @@ def add_machine(uuid, password, update_collectd=True):
     if update_collectd:
         update_collectd_conf()
 
+    # add no-data rule
+    update_rule(machine.uuid, 'nodata', 'nodata', 'gt', 0, 60)
+
 
 def remove_machine(uuid):
     """Removes a machine from monitored list and from collectd's conf files."""
@@ -138,6 +141,9 @@ def update_rule(uuid, rule_id, metric, operator, value, time_to_wait):
     condition.value = value
     condition.time_to_wait = time_to_wait
     condition.cond_id = get_rand_token()
+    # we set not level to 1 so that new rules that are not satisfied
+    # don't send an OK to core immediately after creation
+    condition.notification_level = 1
     condition.create()
 
     with machine.lock_n_load():
@@ -176,7 +182,7 @@ def remove_rule(uuid, rule_id):
 
 def get_stats(uuid, metrics=None, start=0, stop=0):
     allowed_targets = {
-        'cpu': graphite.CpuSeries,
+        'cpu': graphite.CpuAllSeries,
         'load': graphite.LoadSeries,
         'memory': graphite.MemSeries,
         'disk': graphite.DiskAllSeries,

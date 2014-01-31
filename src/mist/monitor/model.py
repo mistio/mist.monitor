@@ -27,7 +27,7 @@ class Condition(OODictMongoMemcache):
 
     metric = StrField()
     operator = StrField()
-    value = StrField()
+    value = FloatField()
     time_to_wait = IntField()
 
     state = BoolField()

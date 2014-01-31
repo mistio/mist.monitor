@@ -2,14 +2,9 @@ import abc
 import logging
 import requests
 
-import numpy
-
 from mist.monitor import config
 from mist.monitor.exceptions import GraphiteError
 
-
-MACHINE_PREFIX = "mist"
-MIN_INTERVAL = 10
 
 REQ_SESSION = None
 
@@ -18,16 +13,18 @@ log = logging.getLogger(__name__)
 
 class BaseGraphiteSeries(object):
     """Base graphite target class that defines an interface and provides
-    convinience methods for subclasses to use."""
+    convenience methods for subclasses to use."""
 
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, uuid):
+        """A uuid is required to initialize the class."""
         self.uuid = uuid
 
     @property
     def head(self):
-        return "%s-%s" % (MACHINE_PREFIX, self.uuid)
+        """Top level data target."""
+        return "mist-%s" % (self.uuid)
 
     @abc.abstractmethod
     def get_targets(self):
@@ -46,7 +43,7 @@ class BaseGraphiteSeries(object):
         new_data = {}
         for item in data:
             target = item['target']
-            new_data[target] = [value    #(timestamp, value)
+            new_data[target] = [(timestamp, value)
                                 for value, timestamp in item['datapoints']
                                 if value is not None]
         return new_data
@@ -62,7 +59,7 @@ class BaseGraphiteSeries(object):
             uri += "&until=%s" % stop
         return uri
 
-    def _graphite_request(self, uri, use_session=False):
+    def _graphite_request(self, uri, use_session=True):
         """Issue a request to graphite."""
 
         global REQ_SESSION
@@ -94,20 +91,26 @@ class BaseGraphiteSeries(object):
 
 
 class SingleGraphiteSeries(BaseGraphiteSeries):
+    """A SingleGraphiteSeries returns a single graphite data series.
+
+    Every subclass needs to define an alias property.
+    It must always return a single series inside a dict, using the alias as
+    key.
+
+    """
 
     @abc.abstractproperty
     def alias(self):
-        return ""
-
-    @abc.abstractproperty
-    def reduce_function(self):
-        """Must return a string in ['sum', 'avg', 'max', 'min', 'last']"""
         return ""
 
     def __init__(self, uuid, alias=""):
         super(SingleGraphiteSeries, self).__init__(uuid)
         if alias:
             self.alias = alias
+
+
+class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
+    """The simplest case of a SingleGraphiteSeries, using a single target."""
 
     @abc.abstractmethod
     def get_inner_target(self):
@@ -121,27 +124,9 @@ class SingleGraphiteSeries(BaseGraphiteSeries):
         """Only parse relevant data."""
         for item in data:
             if item['target'] == self.alias:
-                return super(SingleGraphiteSeries, self)._post_process_series(
-                    [item]
-                )
-        return {}
-
-    def _reduce_datapoints(self, datapoints):
-        # strip nulls
-        # datapoints = [point for point in datapoints if point is not None]
-        if not datapoints:
-            return None
-        if self.reduce_function == 'avg':
-            return numpy.median(datapoints)
-        elif self.reduce_function == 'sum':
-            return numpy.sum(datapoints)
-        else:
-            return None
-
-    def get_value(self, start=0, stop=0):
-        data = self.get_series(start, stop)
-        datapoints = data[self.alias]
-        return self._reduce_datapoints(datapoints)
+                return super(SimpleSingleGraphiteSeries,
+                             self)._post_process_series([item])
+        return {self.alias: []}
 
 
 class CombinedGraphiteSeries(BaseGraphiteSeries):
@@ -169,10 +154,11 @@ class CombinedGraphiteSeries(BaseGraphiteSeries):
         return new_data
 
 
-class CpuSeries(SingleGraphiteSeries):
+class CpuUtilSeries(SimpleSingleGraphiteSeries):
+    """Return CPU utilization as a percentage."""
 
-    alias = "cpu"
-    reduce_function = "avg"
+    alias = "cpu-util"
+    ## reduce_function = "avg"
 
     def get_inner_target(self):
         # Calculate the sum of all time measurements, excluding the "idle" one
@@ -186,34 +172,37 @@ class CpuSeries(SingleGraphiteSeries):
         target = "divideSeries(%s,%s)" % (first_set, second_set)
         return target
 
+
+class CpuAllSeries(CombinedGraphiteSeries):
+    """Return all CPU data in a nested dict."""
+
+    def __init__(self, uuid):
+        series_list = [CpuUtilSeries(uuid)]
+        super(CpuAllSeries, self).__init__(uuid, series_list)
+
     def _post_process_series(self, data):
-        data = super(CpuSeries, self)._post_process_series(data)
+        data = super(CpuAllSeries, self)._post_process_series(data)
         return {
             'cpu': {
                 'cores': 1,
-                'utilization': data['cpu'],
+                'utilization': data[self.series_list[0].alias],
             }
         }
 
-    def get_value(self, start=0, stop=0):
-        data = self.get_series(start, stop)
-        datapoints = data[self.alias]['utilization']
-        return self._reduce_datapoints(datapoints)
 
-
-class LoadSeries(SingleGraphiteSeries):
+class LoadSeries(SimpleSingleGraphiteSeries):
 
     alias = "load"
-    reduce_function = "avg"
+    ## reduce_function = "avg"
 
     def get_inner_target(self):
         return "%s.load.load.shortterm" % (self.head)
 
 
-class NetSeries(SingleGraphiteSeries):
+class NetSeries(SimpleSingleGraphiteSeries):
 
     alias = "net"
-    reduce_function = "avg"
+    ## reduce_function = "avg"
     direction = "*"
     iface = "*"
 
@@ -255,17 +244,17 @@ class NetAllSeries(CombinedGraphiteSeries):
         return {
             'network': {
                 'eth0': {
-                    'rx': data['net-rx'],
-                    'tx': data['net-tx'],
+                    'rx': data[self.series_list[0].alias],
+                    'tx': data[self.series_list[1].alias],
                 }
             }
         }
 
 
-class MemSeries(SingleGraphiteSeries):
+class MemSeries(SimpleSingleGraphiteSeries):
 
     alias = "memory"
-    reduce_function = "avg"
+    ## reduce_function = "avg"
 
     def get_inner_target(self):
         target_used = 'sumSeries(%s.memory.memory-{buffered,cached,used})' % (self.head)
@@ -274,10 +263,10 @@ class MemSeries(SingleGraphiteSeries):
         return target_perc
 
 
-class DiskSeries(SingleGraphiteSeries):
+class DiskSeries(SimpleSingleGraphiteSeries):
 
     alias = "disk"
-    reduce_function = "avg"
+    ## reduce_function = "avg"
     direction = "*"
 
     def __init__(self, uuid, alias="", direction=""):
@@ -316,12 +305,12 @@ class DiskAllSeries(CombinedGraphiteSeries):
                 'disks': 1,
                 'read': {
                     'xvda1': {
-                        'disk_octets': data['disk-read'],
+                        'disk_octets': data[self.series_list[0].alias],
                     }
                 },
                 'write': {
                     'xvda1': {
-                        'disk_octets': data['disk-write'],
+                        'disk_octets': data[self.series_list[1].alias],
                     }
                 },
             }
@@ -329,13 +318,55 @@ class DiskAllSeries(CombinedGraphiteSeries):
 
 
 class AllSeries(CombinedGraphiteSeries):
+    """This combines several series and constructs the nested dict returned
+    by get_stats."""
 
     def __init__(self, uuid):
         series_list = [
-            CpuSeries(uuid),
+            CpuAllSeries(uuid),
             MemSeries(uuid),
             LoadSeries(uuid),
             NetAllSeries(uuid),
             DiskAllSeries(uuid),
         ]
         super(AllSeries, self).__init__(uuid, series_list)
+
+
+class NoDataSeries(CombinedGraphiteSeries, SingleGraphiteSeries):
+    """Special series returning 0 or 1 values depending on whether there are
+    any data available."""
+
+    alias = "nodata"
+
+    def __init__(self, uuid, alias=""):
+        if alias:
+            self.alias = alias
+        series_list = [
+            #MemSeries(uuid),
+            LoadSeries(uuid),
+            #CpuUtilSeries(uuid),
+        ]
+        super(NoDataSeries, self).__init__(uuid, series_list)
+
+
+    def _post_process_series(self, data):
+        # All this is weird. Don't do stuff like this in any other class, plz!
+        aliases = [series.alias for series in self.series_list]
+        tmp_data = {}
+        for item in data:
+            if item['target'] in aliases:
+                for value, timestamp in item['datapoints']:
+                    if timestamp not in tmp_data:
+                        tmp_data[timestamp] = []
+                    if value is not None:
+                        tmp_data[timestamp].append(value)
+        new_data = {self.alias: []}
+        for timestamp in sorted(tmp_data.keys()):
+            if tmp_data[timestamp]:
+                new_data[self.alias].append((timestamp, 0))
+            else:
+                new_data[self.alias].append((timestamp, 1))
+        # hack to handle case where graphite knows nothing
+        if not new_data[self.alias]:
+            new_data[self.alias] = [(0, 1)]
+        return new_data
