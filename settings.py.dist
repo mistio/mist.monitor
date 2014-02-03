@@ -8,6 +8,20 @@
 
 #MONGO_URI = "localhost:27022"
 
+# Needed to know the step, to ask one more step to handle less values for derivatives
+# 10 secs for the last day,
+# 60 secs for the last week,
+# 5 mins for the last month,
+# 1 hour for the last year,
+# 1 day for the last 5 years,
+#RETENTIONS = {
+    #60 * 60 * 24: 10,
+    #60 * 60 * 24 * 7: 60,
+    #60 * 60 * 24 * 30: 60 * 5,
+    #60 * 60 * 24 * 30 * 12: 60 * 60,
+    #60 * 60 * 24 * 30 * 12 * 5: 60 * 60 * 24
+#}
+
 # Reset key is used to reset monitor's data. It needs to be set to a non empty
 # string and sent along with a reset http request from core. Under normal
 # circumstances it should be left blank for security reasons.

@@ -1,6 +1,7 @@
 import abc
 import logging
 import requests
+from time import time
 
 from mist.monitor import config
 from mist.monitor.exceptions import GraphiteError
@@ -41,7 +42,7 @@ class BaseGraphiteSeries(object):
             If transform_null=value, null values are replaced by value.
         """
         uri = self._construct_graphite_uri(self.get_targets(), start, stop)
-        data = self._graphite_request(uri)
+        data = self._graphite_request(uri, filter_from=start)
         return self._post_process_series(data, transform_null=transform_null)
 
     def _post_process_series(self, data, transform_null=None):
@@ -81,15 +82,23 @@ class BaseGraphiteSeries(object):
     def _construct_graphite_uri(self, targets, start, stop):
         targets_str = "&".join(["target=%s" % target for target in targets])
         uri = "%s/render?%s&format=json" % (config.GRAPHITE_URI, targets_str)
-        start = int(start)
-        stop = int(stop)
+        start = float(start)
+        stop = float(stop)
         if start:
-            uri += "&from=%s" % start
+            # Ask for some more cause derivatives will always return None
+            # as their first value. Check RENTENTIONS from config to find step.
+            ago = time() - start
+            for period in sorted(config.RETENTIONS.keys()):
+                if ago <= period:
+                    step = config.RETENTIONS[period]
+                    start -= 2 * step
+                    break
+            uri += "&from=%d" % start
         if stop:
-            uri += "&until=%s" % stop
+            uri += "&until=%d" % stop
         return uri
 
-    def _graphite_request(self, uri, use_session=True):
+    def _graphite_request(self, uri, filter_from=0, use_session=True):
         """Issue a request to graphite."""
 
         global REQ_SESSION
@@ -117,7 +126,12 @@ class BaseGraphiteSeries(object):
                       resp.status_code, resp.text)
             raise GraphiteError()
 
-        return resp.json()
+        raw_data = resp.json()
+        if filter_from:
+            for item in raw_data:
+                item['datapoints'] = [point for point in item['datapoints']
+                                      if point[1] >= filter_from]
+        return raw_data
 
 
 class SingleGraphiteSeries(BaseGraphiteSeries):
