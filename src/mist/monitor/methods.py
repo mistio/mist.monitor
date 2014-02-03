@@ -198,7 +198,7 @@ def get_stats(uuid, metrics, start=0, stop=0):
             raise BadRequestError("metric '%s' not allowed" % metric)
         series_list.append(allowed_targets[metric](uuid))
     series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
-    return series.get_series(start, stop)
+    return series.get_series(start, stop, transform_null=0)
 
 
 def reset_hard(data):

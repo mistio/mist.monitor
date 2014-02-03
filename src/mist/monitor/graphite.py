@@ -31,21 +31,51 @@ class BaseGraphiteSeries(object):
         """Return list of target strings."""
         return []
 
-    def get_series(self, start=0, stop=0):
-        """Get time series from graphite."""
+    def get_series(self, start=0, stop=0, transform_null=None):
+        """Get time series from graphite.
+
+        Optional start and stop parameters define time range.
+        transform_null defines handling of null values in graphite.
+            If transform_null=False, null's are left in place (as None's)
+            If transform_null=None, null's are stripped
+            If transform_null=value, null values are replaced by value.
+        """
         uri = self._construct_graphite_uri(self.get_targets(), start, stop)
         data = self._graphite_request(uri)
-        return self._post_process_series(data)
+        return self._post_process_series(data, transform_null=transform_null)
 
-    def _post_process_series(self, data):
-        """Change to (timestamp, value) pairs and strip null."""
+    def _post_process_series(self, data, transform_null=None):
+        """Change to (timestamp, value) pairs and process null values.
+
+        transform_null defines handling of null values in graphite.
+            If transform_null=False, null's are left in place (as None's)
+            If transform_null=None, null's are stripped
+            If transform_null=value, null values are replaced by value.
+
+        """
 
         new_data = {}
-        for item in data:
-            target = item['target']
-            new_data[target] = [(timestamp, value)
-                                for value, timestamp in item['datapoints']
-                                if value is not None]
+        if transform_null is None:
+            # strip null values
+            for item in data:
+                target = item['target']
+                new_data[target] = [(timestamp, value)
+                                    for value, timestamp in item['datapoints']
+                                    if value is not None]
+        elif transform_null is False:
+            # leave null's as is (None's)
+            for item in data:
+                target = item['target']
+                new_data[target] = [(timestamp, value)
+                                    for value, timestamp in item['datapoints']]
+        else:
+            # transform null values
+            for item in data:
+                target = item['target']
+                new_data[target] = [
+                    (timestamp, value if value is not None else transform_null)
+                    for value, timestamp in item['datapoints']
+                ]
         return new_data
 
     def _construct_graphite_uri(self, targets, start, stop):
@@ -120,12 +150,12 @@ class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
         target = "alias(%s,'%s')" % (self.get_inner_target(), self.alias)
         return [target]
 
-    def _post_process_series(self, data):
+    def _post_process_series(self, data, transform_null=None):
         """Only parse relevant data."""
         for item in data:
             if item['target'] == self.alias:
                 return super(SimpleSingleGraphiteSeries,
-                             self)._post_process_series([item])
+                             self)._post_process_series([item], transform_null)
         return {self.alias: []}
 
 
@@ -147,10 +177,10 @@ class CombinedGraphiteSeries(BaseGraphiteSeries):
             targets += series.get_targets()
         return targets
 
-    def _post_process_series(self, data):
+    def _post_process_series(self, data, transform_null=None):
         new_data = {}
         for series in self.series_list:
-            new_data.update(series._post_process_series(data))
+            new_data.update(series._post_process_series(data, transform_null))
         return new_data
 
 
@@ -180,8 +210,8 @@ class CpuAllSeries(CombinedGraphiteSeries):
         series_list = [CpuUtilSeries(uuid)]
         super(CpuAllSeries, self).__init__(uuid, series_list)
 
-    def _post_process_series(self, data):
-        data = super(CpuAllSeries, self)._post_process_series(data)
+    def _post_process_series(self, data, transform_null=None):
+        data = super(CpuAllSeries, self)._post_process_series(data, transform_null)
         return {
             'cpu': {
                 'cores': 1,
@@ -239,8 +269,8 @@ class NetAllSeries(CombinedGraphiteSeries):
                        NetTxSeries(uuid, iface='eth0')]
         super(NetAllSeries, self).__init__(uuid, series_list)
 
-    def _post_process_series(self, data):
-        data = super(NetAllSeries, self)._post_process_series(data)
+    def _post_process_series(self, data, transform_null=None):
+        data = super(NetAllSeries, self)._post_process_series(data, transform_null)
         return {
             'network': {
                 'eth0': {
@@ -298,8 +328,8 @@ class DiskAllSeries(CombinedGraphiteSeries):
         series_list = [DiskReadSeries(uuid), DiskWriteSeries(uuid)]
         super(DiskAllSeries, self).__init__(uuid, series_list)
 
-    def _post_process_series(self, data):
-        data = super(DiskAllSeries, self)._post_process_series(data)
+    def _post_process_series(self, data, transform_null=None):
+        data = super(DiskAllSeries, self)._post_process_series(data, transform_null)
         return {
             'disk': {
                 'disks': 1,
@@ -349,7 +379,8 @@ class NoDataSeries(CombinedGraphiteSeries, SingleGraphiteSeries):
         super(NoDataSeries, self).__init__(uuid, series_list)
 
 
-    def _post_process_series(self, data):
+    def _post_process_series(self, data, transform_null=None):
+        """transform_null is ignored here."""
         # All this is weird. Don't do stuff like this in any other class, plz!
         aliases = [series.alias for series in self.series_list]
         tmp_data = {}

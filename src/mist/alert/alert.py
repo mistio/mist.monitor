@@ -184,7 +184,7 @@ def main():
         t1 = time()
         log.info("Run completed in %.1f seconds.", (t1 - t0))
         log.info("=" * 79)
-        sleep(1)
+        sleep(10)
 
 
 if __name__ == "__main__":
