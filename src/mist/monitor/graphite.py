@@ -213,7 +213,8 @@ class CpuUtilSeries(SimpleSingleGraphiteSeries):
         first_set = 'derivative(%s)' % (total_wo_idle_sum)
         second_set = 'derivative(%s)' % (total_sum)
         # Divide the first with the second sum (wo_idle_sum / total_sum)
-        target = "divideSeries(%s,%s)" % (first_set, second_set)
+        #target = "divideSeries(%s,%s)" % (first_set, second_set)
+        target = "asPercent(%s,%s)" % (first_set, second_set)
         return target
 
 
