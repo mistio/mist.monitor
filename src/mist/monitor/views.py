@@ -60,20 +60,16 @@ def list_machines(request):
             for rule_id in machine.rules}
 
 
-@view_config(route_name='machines', request_method='PUT')
+@view_config(route_name='machine', request_method='PUT')
 def add_machine(request):
     """Adds machine to monitored list."""
-    uuid = request.params.get('uuid')
+    uuid = request.matchdict['machine']
     passwd = request.params.get('passwd')
     log.info("Adding machine %s to monitor list" % (uuid))
-
-    if not uuid:
-        raise RequiredParameterMissingError('uuid')
     if not passwd:
         raise RequiredParameterMissingError('passwd')
 
     methods.add_machine(uuid, passwd)
-
     return OK
 
 
@@ -83,33 +79,41 @@ def remove_machine(request):
     uuid = request.matchdict['machine']
     log.info("Removing machine %s from monitor list" % (uuid))
 
-    machine = get_machine_from_uuid(uuid)
-    if not machine:
-        raise MachineNotFoundError(uuid)
-
     methods.remove_machine(uuid)
     return OK
 
 
-@view_config(route_name='rules', request_method='PUT', renderer='json')
-def update_rules(request):
+@view_config(route_name='rule', request_method='PUT')
+def add_rule(request):
+    """Add or update rule.
+
+    This will create a new condition that will start being checked with clear
+    history, even if the rule is not actually being changed.
+
+    """
+    uuid = request.matchdict['machine']
+    rule_id = request.matchdict['rule']
 
     params = request.json_body
-    action = params.get('rule_action')  #FIXME: use different HTTP method ffs!
-    uuid = params.get("uuid")
-    rule_id = params.get("rule_id")
+    for key in ["metric", "operator", "value"]:
+        if not params.get(key):
+            raise RequiredParameterMissingError(key)
+    metric = params["metric"]
+    operator = params["operator"]
+    value = params["value"]
+    reminder_list = params.get("reminder_list")
+    if metric in ['network-tx', 'disk-write']:
+        value = float(value) * 1000
 
-    if action == 'add':
-        metric = params.get("metric")
-        operator = params.get("operator")
-        value = params.get("value")
-        time_to_wait = params.get("time_to_wait")
-        if metric in ['network-tx', 'disk-write']:
-            value = float(value) * 1000
-        methods.update_rule(uuid, rule_id, metric, operator, value, time_to_wait)
-    else:
-        methods.remove_rule(uuid, rule_id)
+    methods.add_rule(uuid, rule_id, metric, operator, value, reminder_list)
+    return OK
 
+@view_config(route_name='rule', request_method='DELETE')
+def remove_rule(request):
+    """Removes rule and corresponding condition."""
+    uuid = request.matchdict['machine']
+    rule_id = request.matchdict['rule']
+    methods.remove_rule(uuid, rule_id)
     return OK
 
 
@@ -134,8 +138,18 @@ def get_stats(request):
     return methods.get_stats(uuid, expression, start, stop)
 
 
-@view_config(route_name='reset', request_method='PUT')
+@view_config(route_name='reset', request_method='POST')
 def reset_hard(request):
+    """Reset mist.monitor with data provided from mist.core
+
+    This is a special view that will cause monitor to drop all known data
+    for machines, rules and conditions, will repopulate itself with the data
+    provided in the request and will restart collectd and mist.alert.
+
+    For security reasons, a special non empty key needs to be specified in
+    settings.py and sent along with the reset request.
+
+    """
     params = request.json_body
     key, data = params.get('key'), params.get('data', {})
     if not config.RESET_KEY:

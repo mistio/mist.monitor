@@ -68,12 +68,15 @@ def add_machine(uuid, password, update_collectd=True):
 
     machine = get_machine_from_uuid(uuid)
     if machine:
-        raise MachineExistsError(uuid)
-
-    machine = Machine()
-    machine.uuid = uuid
-    machine.collectd_password = password
-    machine.create()
+        ## raise MachineExistsError(uuid)
+        with machine.lock_n_load():
+            machine.collectd_password = password
+            machine.save()
+    else:
+        machine = Machine()
+        machine.uuid = uuid
+        machine.collectd_password = password
+        machine.create()
 
     # Create new collectd conf to make collectd only accept data for a certain
     # machine from requests coming from the machine with the right uuid.
@@ -97,7 +100,7 @@ def add_machine(uuid, password, update_collectd=True):
         update_collectd_conf()
 
     # add no-data rule
-    update_rule(machine.uuid, 'nodata', 'nodata', 'gt', 0, 60)
+    add_rule(machine.uuid, 'nodata', 'nodata', 'gt', 0, 60)
 
 
 def remove_machine(uuid):
@@ -125,8 +128,8 @@ def remove_machine(uuid):
     update_collectd_conf()
 
 
-def update_rule(uuid, rule_id, metric, operator, value, time_to_wait):
-    """Add or edit a rule."""
+def add_rule(uuid, rule_id, metric, operator, value, reminder_list):
+    """Add or update a rule."""
 
     machine = get_machine_from_uuid(uuid)
     if not machine:
@@ -139,7 +142,8 @@ def update_rule(uuid, rule_id, metric, operator, value, time_to_wait):
     condition.metric = metric
     condition.operator = operator
     condition.value = value
-    condition.time_to_wait = time_to_wait
+    # reminder_list in not currently actually being used
+    condition.reminder_list = reminder_list or [0, 60, 300, 600]
     condition.cond_id = get_rand_token()
     # we set not level to 1 so that new rules that are not satisfied
     # don't send an OK to core immediately after creation
@@ -180,7 +184,7 @@ def remove_rule(uuid, rule_id):
         machine.save()
 
 
-def get_stats(uuid, metrics=None, start=0, stop=0):
+def get_stats(uuid, metrics, start=0, stop=0):
     allowed_targets = {
         'cpu': graphite.CpuAllSeries,
         'load': graphite.LoadSeries,
@@ -208,7 +212,7 @@ def reset_hard(data):
     Each machine needs to have a collectd_password key.
     Optionally it can contain a rule_key which should be a dict with rule_id's
     as keys and rule dicts as values. A rule_dict nees to have operator,
-    metric, value, time_to_wait etc.
+    metric, value etc.
 
     """
 
@@ -224,13 +228,13 @@ def reset_hard(data):
         add_machine(uuid, machine_dict['collectd_password'],
                     update_collectd=False)
         for rule_id, rule_dict in machine_dict.get('rules', {}).iteritems():
-            update_rule(
+            add_rule(
                 uuid=uuid,
                 rule_id=rule_id,
                 metric=rule_dict['metric'],
                 operator=rule_dict['operator'],
                 value=rule_dict['value'],
-                time_to_wait=rule_dict['time_to_wait'],
+                reminder_list=rule_dict.get('reminder_list'),
             )
 
     # update collectd's conf and reload it

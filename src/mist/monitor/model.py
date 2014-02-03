@@ -18,6 +18,10 @@ from mist.monitor.exceptions import ConditionNotFoundError
 log = logging.getLogger(__name__)
 
 
+class _IntList(FieldsList):
+    _item_type = IntField
+
+
 class Condition(OODictMongoMemcache):
 
     cond_id = StrField()
@@ -28,7 +32,7 @@ class Condition(OODictMongoMemcache):
     metric = StrField()
     operator = StrField()
     value = FloatField()
-    time_to_wait = IntField()
+    reminder_list = _IntList()  # in seconds
 
     state = BoolField()
     state_since = FloatField()
@@ -71,8 +75,8 @@ class Condition(OODictMongoMemcache):
             operator = "greater than"
         else:
             operator = "?"
-        return "%s %s %s for %s seconds" % (
-            self.metric, operator, self.value, self.time_to_wait
+        return "%s %s %s" % (
+            self.metric, operator, self.value
         )
 
 

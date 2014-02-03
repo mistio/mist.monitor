@@ -182,8 +182,8 @@ def main():
         for machine in get_all_machines():
             check_machine(machine)
         t1 = time()
-        print "Run completed in %.1f seconds." % (t1 - t0)
-        print "=" * 79
+        log.info("Run completed in %.1f seconds.", (t1 - t0))
+        log.info("=" * 79)
         sleep(1)
 
 
