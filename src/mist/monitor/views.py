@@ -128,6 +128,7 @@ def get_stats(request):
                             ['cpu', 'load', 'memory', 'disk', 'network'])
     start = int(params.get('start', 0))
     stop = int(params.get('stop', 0))
+    interval_str = params.get('step')
 
     if isinstance(expression, basestring):
         expression = expression.split(',')
@@ -135,7 +136,7 @@ def get_stats(request):
         if target not in allowed_targets:
             raise BadRequestError("Bad target '%s'" % target)
 
-    return methods.get_stats(uuid, expression, start, stop)
+    return methods.get_stats(uuid, expression, start, stop, interval_str)
 
 
 @view_config(route_name='reset', request_method='POST')

@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from subprocess import call
 from time import time
@@ -16,6 +17,7 @@ from mist.monitor.exceptions import RequiredParameterMissingError
 from mist.monitor.exceptions import MachineNotFoundError
 from mist.monitor.exceptions import RuleNotFoundError
 from mist.monitor.exceptions import MachineExistsError
+from mist.monitor.exceptions import BadRequestError
 
 
 log = logging.getLogger(__name__)
@@ -184,7 +186,7 @@ def remove_rule(uuid, rule_id):
         machine.save()
 
 
-def get_stats(uuid, metrics, start=0, stop=0):
+def get_stats(uuid, metrics, start=0, stop=0, interval_str=""):
     allowed_targets = {
         'cpu': graphite.CpuAllSeries,
         'load': graphite.LoadSeries,
@@ -198,7 +200,15 @@ def get_stats(uuid, metrics, start=0, stop=0):
             raise BadRequestError("metric '%s' not allowed" % metric)
         series_list.append(allowed_targets[metric](uuid))
     series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
-    return series.get_series(start, stop, transform_null=0)
+    if re.match("^[0-9]+$", interval_str):
+        interval_str += "secs"
+    elif not (re.match("^[0-9]+secs$", interval_str) or
+              re.match("^[0-9]+mins$", interval_str) or
+              re.match("^[0-9]+hours$", interval_str) or
+              re.match("^[0-9]+days$", interval_str)):
+        raise BadRequestError("Invalid interval_str:'%s'" % interval_str)
+    return series.get_series(start, stop, interval_str=interval_str,
+                             transform_null=0)
 
 
 def reset_hard(data):

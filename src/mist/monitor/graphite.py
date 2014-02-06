@@ -28,11 +28,15 @@ class BaseGraphiteSeries(object):
         return "mist-%s" % (self.uuid)
 
     @abc.abstractmethod
-    def get_targets(self):
-        """Return list of target strings."""
+    def get_targets(self, interval_str=''):
+        """Return list of target strings.
+
+        If interval_str specified, summarize targets accordingly.
+
+        """
         return []
 
-    def get_series(self, start=0, stop=0, transform_null=None):
+    def get_series(self, start=0, stop=0, interval_str="", transform_null=None):
         """Get time series from graphite.
 
         Optional start and stop parameters define time range.
@@ -41,7 +45,8 @@ class BaseGraphiteSeries(object):
             If transform_null=None, null's are stripped
             If transform_null=value, null values are replaced by value.
         """
-        uri = self._construct_graphite_uri(self.get_targets(), start, stop)
+        targets = self.get_targets(interval_str=interval_str)
+        uri = self._construct_graphite_uri(targets, start, stop)
         data = self._graphite_request(uri, filter_from=start)
         return self._post_process_series(data, transform_null=transform_null)
 
@@ -156,12 +161,20 @@ class SingleGraphiteSeries(BaseGraphiteSeries):
 class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
     """The simplest case of a SingleGraphiteSeries, using a single target."""
 
+    @abc.abstractproperty
+    def sum_function():
+        """Must be a string in ['sum', 'avg', 'max', 'min', 'last']."""
+
     @abc.abstractmethod
     def get_inner_target(self):
         pass
 
-    def get_targets(self):
-        target = "alias(%s,'%s')" % (self.get_inner_target(), self.alias)
+    def get_targets(self, interval_str=""):
+        target = self.get_inner_target()
+        if interval_str:
+            target = "smartSummarize(%s,'%s','%s')" % (target, interval_str,
+                                                       self.sum_function)
+        target = "alias(%s,'%s')" % (target, self.alias)
         return [target]
 
     def _post_process_series(self, data, transform_null=None):
@@ -185,10 +198,10 @@ class CombinedGraphiteSeries(BaseGraphiteSeries):
                                 "BaseGraphiteSeries." % series)
         self.series_list = series_list
 
-    def get_targets(self):
+    def get_targets(self, interval_str=""):
         targets = []
         for series in self.series_list:
-            targets += series.get_targets()
+            targets += series.get_targets(interval_str=interval_str)
         return targets
 
     def _post_process_series(self, data, transform_null=None):
@@ -202,7 +215,7 @@ class CpuUtilSeries(SimpleSingleGraphiteSeries):
     """Return CPU utilization as a percentage."""
 
     alias = "cpu-util"
-    ## reduce_function = "avg"
+    sum_function = "avg"
 
     def get_inner_target(self):
         # Calculate the sum of all time measurements, excluding the "idle" one
@@ -238,7 +251,7 @@ class CpuAllSeries(CombinedGraphiteSeries):
 class LoadSeries(SimpleSingleGraphiteSeries):
 
     alias = "load"
-    ## reduce_function = "avg"
+    sum_function = "avg"
 
     def get_inner_target(self):
         return "%s.load.load.shortterm" % (self.head)
@@ -247,7 +260,7 @@ class LoadSeries(SimpleSingleGraphiteSeries):
 class NetSeries(SimpleSingleGraphiteSeries):
 
     alias = "net"
-    ## reduce_function = "avg"
+    sum_function = "avg"
     direction = "*"
     iface = "*"
 
@@ -299,7 +312,7 @@ class NetAllSeries(CombinedGraphiteSeries):
 class MemSeries(SimpleSingleGraphiteSeries):
 
     alias = "memory"
-    ## reduce_function = "avg"
+    sum_function = "avg"
 
     def get_inner_target(self):
         target_used = 'sumSeries(%s.memory.memory-{buffered,cached,used})' % (self.head)
@@ -311,7 +324,7 @@ class MemSeries(SimpleSingleGraphiteSeries):
 class DiskSeries(SimpleSingleGraphiteSeries):
 
     alias = "disk"
-    ## reduce_function = "avg"
+    sum_function = "avg"
     direction = "*"
 
     def __init__(self, uuid, alias="", direction=""):
