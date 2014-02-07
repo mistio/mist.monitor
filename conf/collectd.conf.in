@@ -51,7 +51,7 @@ LoadPlugin rrdtool
 #</Plugin>
 <Plugin write_graphite>
   <Carbon>
-    Host "nepho3.mist.io"
+    Host "localhost"
     Port "2003"
     Prefix "mist-"
     Postfix ""
