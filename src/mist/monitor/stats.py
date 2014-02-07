@@ -1090,8 +1090,8 @@ def graphite_get_massive_stats(host, port, uuid, expression, start, stop, step):
         step = INTERVAL
     #FIXME: we ask for one more number in order to skip the first one returned.
     #In the case of derivatives we get None and D3 chokes on this. 
-    if stop - start == step:
-        start = start - step
+    #if stop - start == step:
+    #    start = start - step
     time_interval = "&from=%s&until=%s" % (start - 2*step, stop - step)
     nrstats = (stop - start) / step
 
