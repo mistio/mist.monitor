@@ -10,16 +10,16 @@ from datetime import datetime
 
 from logging import getLogger
 
-from mist.monitor.stats import graphite_build_cpu_target
-from mist.monitor.stats import graphite_build_mem_target_v2
+from mist.monitor.stats import graphite_build_cpu_target,      graphite_build_inner_cpu_target
+from mist.monitor.stats import graphite_build_mem_target_v2,    graphite_build_inner_mem_target_v2
 from mist.monitor.stats import graphite_build_mem_target
-from mist.monitor.stats import graphite_build_load_target
+from mist.monitor.stats import graphite_build_load_target,      graphite_build_inner_load_target
 from mist.monitor.stats import graphite_build_net_target
 from mist.monitor.stats import graphite_build_disk_target
-from mist.monitor.stats import graphite_build_net_tx_target
-from mist.monitor.stats import graphite_build_disk_write_target
-from mist.monitor.stats import graphite_build_net_rx_target
-from mist.monitor.stats import graphite_build_disk_read_target
+from mist.monitor.stats import graphite_build_net_tx_target,    graphite_build_inner_net_tx_target
+from mist.monitor.stats import graphite_build_disk_write_target, graphite_build_inner_disk_write_target
+from mist.monitor.stats import graphite_build_net_rx_target,    graphite_build_inner_net_rx_target
+from mist.monitor.stats import graphite_build_disk_read_target, graphite_build_inner_disk_read_target
 from mist.monitor.stats import MACHINE_PREFIX
 
 log = getLogger('mist.monitor')
@@ -80,15 +80,15 @@ def build_alert_target(uuid, metric):
     """
     """
 
-    switch_stat = {'cpu': graphite_build_cpu_target,
-                   'ram': graphite_build_mem_target_v2, 
-                   'load': graphite_build_load_target,
+    switch_stat = {'cpu': graphite_build_inner_cpu_target,
+                   'ram': graphite_build_inner_mem_target_v2, 
+                   'load': graphite_build_inner_load_target,
                    'network': graphite_build_net_target,
-                   'network-tx': graphite_build_net_tx_target,
-                   'network-rx': graphite_build_net_rx_target,
+                   'network-tx': graphite_build_inner_net_tx_target,
+                   'network-rx': graphite_build_inner_net_rx_target,
                    'disk': graphite_build_disk_target,
-                   'disk-read': graphite_build_disk_read_target,
-                   'disk-write': graphite_build_disk_write_target,
+                   'disk-read': graphite_build_inner_disk_read_target,
+                   'disk-write': graphite_build_inner_disk_write_target,
                   }
 
     if metric not in metrics:
@@ -97,6 +97,7 @@ def build_alert_target(uuid, metric):
 
     target = switch_stat[metric](uuid)
     ret_target = target.replace('target=','')
+    ret_target = "alias(%s, '%s')" % (ret_target, metric)
 
     return ret_target
     
