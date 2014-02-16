@@ -186,7 +186,7 @@ def remove_rule(uuid, rule_id):
         machine.save()
 
 
-def get_stats(uuid, metrics, start=0, stop=0, interval_str=""):
+def get_stats(uuid, metrics, start="", stop="", interval_str=""):
     allowed_targets = {
         'cpu': graphite.CpuAllSeries,
         'load': graphite.LoadSeries,
@@ -200,15 +200,8 @@ def get_stats(uuid, metrics, start=0, stop=0, interval_str=""):
             raise BadRequestError("metric '%s' not allowed" % metric)
         series_list.append(allowed_targets[metric](uuid))
     series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
-    if re.match("^[0-9]+$", interval_str):
-        interval_str += "secs"
-    elif not (re.match("^[0-9]+secs$", interval_str) or
-              re.match("^[0-9]+mins$", interval_str) or
-              re.match("^[0-9]+hours$", interval_str) or
-              re.match("^[0-9]+days$", interval_str)):
-        raise BadRequestError("Invalid interval_str:'%s'" % interval_str)
     return series.get_series(start, stop, interval_str=interval_str,
-                             transform_null=0)
+                             transform_null=False)
 
 
 def reset_hard(data):

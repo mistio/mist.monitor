@@ -1,7 +1,10 @@
 import abc
+import re
 import logging
+import HTMLParser
 import requests
 from time import time
+
 
 from mist.monitor import config
 from mist.monitor.exceptions import GraphiteError
@@ -36,7 +39,7 @@ class BaseGraphiteSeries(object):
         """
         return []
 
-    def get_series(self, start=0, stop=0, interval_str="", transform_null=None):
+    def get_series(self, start="", stop="", interval_str="", transform_null=None):
         """Get time series from graphite.
 
         Optional start and stop parameters define time range.
@@ -47,7 +50,11 @@ class BaseGraphiteSeries(object):
         """
         targets = self.get_targets(interval_str=interval_str)
         uri = self._construct_graphite_uri(targets, start, stop)
-        data = self._graphite_request(uri, filter_from=start)
+        if re.match("^[0-9]+(\.[0-9]+)?$", start):
+            filter_from = int(start)
+        else:
+            filter_from = 0
+        data = self._graphite_request(uri, filter_from=filter_from)
         return self._post_process_series(data, transform_null=transform_null)
 
     def _post_process_series(self, data, transform_null=None):
@@ -84,23 +91,24 @@ class BaseGraphiteSeries(object):
                 ]
         return new_data
 
-    def _construct_graphite_uri(self, targets, start, stop):
+    def _construct_graphite_uri(self, targets, start="", stop=""):
         targets_str = "&".join(["target=%s" % target for target in targets])
         uri = "%s/render?%s&format=json" % (config.GRAPHITE_URI, targets_str)
-        start = float(start)
-        stop = float(stop)
-        if start:
+        start = start
+        stop = stop
+        if re.match("^[0-9]+(\.[0-9]+)?$", start):
             # Ask for some more cause derivatives will always return None
             # as their first value. Check RENTENTIONS from config to find step.
+            start = int(start)
             ago = time() - start
             for period in sorted(config.RETENTIONS.keys()):
                 if ago <= period:
                     step = config.RETENTIONS[period]
                     start -= 2 * step
                     break
-            uri += "&from=%d" % start
+            uri += "&from=%s" % start
         if stop:
-            uri += "&until=%d" % stop
+            uri += "&until=%s" % stop
         return uri
 
     def _graphite_request(self, uri, filter_from=0, use_session=True):
@@ -126,10 +134,18 @@ class BaseGraphiteSeries(object):
             log.error("Error sending request to graphite: %r", exc)
             raise GraphiteError(repr(exc))
 
-        if resp.status_code != 200:
+        if not resp.ok:
+            reason = ""
+            try:
+                search = re.search("Exception: (.*)", resp.text)
+                if search:
+                    reason = search.groups()[0]
+                    reason = HTMLParser.HTMLParser().unescape(reason)
+            except:
+                pass
             log.error("Got error response from graphite: [%d] %s",
-                      resp.status_code, resp.text)
-            raise GraphiteError()
+                      resp.status_code, reason or resp.text)
+            raise GraphiteError(reason)
 
         raw_data = resp.json()
         if filter_from:

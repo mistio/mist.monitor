@@ -126,8 +126,8 @@ def get_stats(request):
     allowed_targets = ['cpu', 'load', 'memory', 'disk', 'network']
     expression = params.get('expression',
                             ['cpu', 'load', 'memory', 'disk', 'network'])
-    start = int(params.get('start', 0))
-    stop = int(params.get('stop', 0))
+    start = params.get('start')
+    stop = params.get('stop')
     interval_str = params.get('step')
 
     if isinstance(expression, basestring):

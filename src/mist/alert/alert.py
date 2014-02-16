@@ -161,9 +161,9 @@ def check_machine(machine, rule_id=''):
     combined_series = CombinedGraphiteSeries(machine.uuid,
                                              conditions_series.values())
     try:
-        data = combined_series.get_series(time() - 70)
-    except GraphiteError:
-        log.warning("  * Got a graphite request error, probably due to no data.")
+        data = combined_series.get_series("-1min")  #(int(time() - 70))
+    except GraphiteError as exc:
+        log.warning("%r", exc)
         return
 
     # check all conditions
