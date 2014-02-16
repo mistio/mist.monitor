@@ -48,12 +48,33 @@ class BaseGraphiteSeries(object):
             If transform_null=None, null's are stripped
             If transform_null=value, null values are replaced by value.
         """
-        targets = self.get_targets(interval_str=interval_str)
-        uri = self._construct_graphite_uri(targets, start, stop)
+
+        # if start is a timestamp
         if re.match("^[0-9]+(\.[0-9]+)?$", start):
-            filter_from = int(start)
+            # Ask for some more cause derivatives will always return None
+            # as their first value. Check RETENTIONS from config to find step.
+            start = int(start)
+            filter_from = start
+            ago = time() - start
+            for period in sorted(config.RETENTIONS.keys()):
+                if ago <= period:
+                    step = config.RETENTIONS[period]
+                    start -= 2 * step
+                    break
+            start = str(start)
+            # remove interval_str if <= step so that we won't get nulls in
+            # between measurements (if <) or last measurement null (if =)
+            # only works if interval_str is in seconds
+            interval_str_match = re.match("^([0-9]+)(?:sec)?s?$", interval_str)
+            if interval_str_match:
+                interval_secs = int(interval_str_match.groups()[0])
+                if interval_secs <= step:
+                    interval_str = ""
         else:
             filter_from = 0
+
+        targets = self.get_targets(interval_str=interval_str)
+        uri = self._construct_graphite_uri(targets, start, stop)
         data = self._graphite_request(uri, filter_from=filter_from)
         return self._post_process_series(data, transform_null=transform_null)
 
@@ -94,18 +115,7 @@ class BaseGraphiteSeries(object):
     def _construct_graphite_uri(self, targets, start="", stop=""):
         targets_str = "&".join(["target=%s" % target for target in targets])
         uri = "%s/render?%s&format=json" % (config.GRAPHITE_URI, targets_str)
-        start = start
-        stop = stop
-        if re.match("^[0-9]+(\.[0-9]+)?$", start):
-            # Ask for some more cause derivatives will always return None
-            # as their first value. Check RENTENTIONS from config to find step.
-            start = int(start)
-            ago = time() - start
-            for period in sorted(config.RETENTIONS.keys()):
-                if ago <= period:
-                    step = config.RETENTIONS[period]
-                    start -= 2 * step
-                    break
+        if start:
             uri += "&from=%s" % start
         if stop:
             uri += "&until=%s" % stop
@@ -188,8 +198,8 @@ class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
     def get_targets(self, interval_str=""):
         target = self.get_inner_target()
         if interval_str:
-            target = "smartSummarize(%s,'%s','%s')" % (target, interval_str,
-                                                       self.sum_function)
+            target = "summarize(%s,'%s','%s')" % (target, interval_str,
+                                                  self.sum_function)
         target = "alias(%s,'%s')" % (target, self.alias)
         return [target]
 
@@ -235,12 +245,12 @@ class CpuUtilSeries(SimpleSingleGraphiteSeries):
 
     def get_inner_target(self):
         # Calculate the sum of all time measurements, excluding the "idle" one
-        total_wo_idle_sum = 'sumSeries(exclude(%s.cpu-0.*,"idle"))' % (self.head)
+        total_wo_idle_sum = "sumSeries(exclude(%s.cpu-0.*,'idle'))" % (self.head)
         # Calculate the sum of all time measurements
-        total_sum = 'sumSeries(%s.cpu-0.*)' % (self.head)
+        total_sum = "sumSeries(%s.cpu-0.*)" % (self.head)
         # Calculate the derivative of each sum
-        first_set = 'derivative(%s)' % (total_wo_idle_sum)
-        second_set = 'derivative(%s)' % (total_sum)
+        first_set = "derivative(%s)" % (total_wo_idle_sum)
+        second_set = "derivative(%s)" % (total_sum)
         # Divide the first with the second sum (wo_idle_sum / total_sum)
         #target = "divideSeries(%s,%s)" % (first_set, second_set)
         target = "asPercent(%s,%s)" % (first_set, second_set)
