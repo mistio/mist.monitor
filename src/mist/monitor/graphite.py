@@ -298,7 +298,7 @@ class NetSeries(SimpleSingleGraphiteSeries):
         super(NetSeries, self).__init__(uuid, alias=alias)
 
     def get_inner_target(self):
-        return "derivative(sumSeries(%s.interface-%s.if_octets.%s))" % (
+        return "nonNegativeDerivative(sumSeries(%s.interface-%s.if_octets.%s))" % (
             self.head, self.iface, self.direction
         )
 
@@ -359,7 +359,7 @@ class DiskSeries(SimpleSingleGraphiteSeries):
         super(DiskSeries, self).__init__(uuid, alias=alias)
 
     def get_inner_target(self):
-        return "derivative(sumSeries(%s.disk-*.%s.%s))" % (
+        return "nonNegativeDerivative(sumSeries(%s.disk-*.%s.%s))" % (
             self.head, 'disk_octets', self.direction
         )
 
