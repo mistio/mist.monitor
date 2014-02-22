@@ -102,7 +102,7 @@ def add_machine(uuid, password, update_collectd=True):
         update_collectd_conf()
 
     # add no-data rule
-    add_rule(machine.uuid, 'nodata', 'nodata', 'gt', 0, 60)
+    add_rule(machine.uuid, 'nodata', 'nodata', 'gt', 0)
 
 
 def remove_machine(uuid):
@@ -130,7 +130,7 @@ def remove_machine(uuid):
     update_collectd_conf()
 
 
-def add_rule(uuid, rule_id, metric, operator, value, reminder_list):
+def add_rule(uuid, rule_id, metric, operator, value, reminder_list=None):
     """Add or update a rule."""
 
     machine = get_machine_from_uuid(uuid)
@@ -144,8 +144,10 @@ def add_rule(uuid, rule_id, metric, operator, value, reminder_list):
     condition.metric = metric
     condition.operator = operator
     condition.value = value
-    # reminder_list in not currently actually being used
-    condition.reminder_list = reminder_list or [0, 60, 300, 600]
+    # reminder_list should be a list of integers (notifications after rule
+    # being triggered in seconds). If not provided, default will be used.
+    if reminder_list:
+        condition.reminder_list = reminder_list
     condition.cond_id = get_rand_token()
     # we set not level to 1 so that new rules that are not satisfied
     # don't send an OK to core immediately after creation

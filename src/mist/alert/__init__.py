@@ -1,1 +1,1 @@
-from mist.monitor import config
+from mist.alert.alert import main

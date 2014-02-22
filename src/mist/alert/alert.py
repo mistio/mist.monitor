@@ -17,7 +17,7 @@ from mist.monitor.graphite import NetTxSeries
 from mist.monitor.exceptions import ConditionNotFoundError
 from mist.monitor.exceptions import GraphiteError
 
-from mist.alert import config
+from mist.monitor import config
 
 
 log = logging.getLogger(__name__)
@@ -53,14 +53,6 @@ OPERATORS_MAP = {
 }
 
 
-NOTIFICATIONS_TIMINGS = [
-    0,
-    60,
-    300,
-    600,
-]
-
-
 def notify_core(condition, value):
     if not condition.state:
         log.debug("sending OK to core")
@@ -82,7 +74,8 @@ def notify_core(condition, value):
         'since': int(condition.state_since),
         'notification_level': condition.notification_level,
     }
-    resp = requests.put(config.CORE_URI + "/rules", params=params, verify=False)
+    resp = requests.put(config.CORE_URI + "/rules", params=params,
+                        verify=config.SSL_VERIFY)
 
 
 def check_condition(condition, series):
@@ -107,9 +100,10 @@ def check_condition(condition, series):
              value, condition.notification_level)
 
     # notify core if necessary
-    if condition.state and len(NOTIFICATIONS_TIMINGS) > condition.notification_level:
+    reminder_list = condition.reminder_list or config.REMINDER_LIST
+    if condition.state and len(reminder_list) > condition.notification_level:
         duration = time() - condition.state_since
-        next_notification = NOTIFICATIONS_TIMINGS[condition.notification_level]
+        next_notification = reminder_list[condition.notification_level]
         if duration >= next_notification:
             log.info("    * sending WARNING to core")
             notify_core(condition, value)
@@ -182,9 +176,17 @@ def main():
         for machine in get_all_machines():
             check_machine(machine)
         t1 = time()
-        log.info("Run completed in %.1f seconds.", (t1 - t0))
+        dt = t1 - t0
+        run_msg = "Run completed in %.1f seconds." % dt
+        sleep_time = config.ALERT_PERIOD - dt
+        if sleep_time > 0:
+            log.info("%s Sleeping for %.1f seconds.", run_msg, sleep_time)
+            sleep(sleep_time)
+        else:
+            log.warning("%s Will not sleep because ALERT_PERIOD=%d",
+                        run_msg, config.ALERT_PERIOD)
         log.info("=" * 79)
-        sleep(10)
+
 
 
 if __name__ == "__main__":

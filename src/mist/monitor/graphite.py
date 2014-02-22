@@ -226,9 +226,18 @@ class CombinedGraphiteSeries(BaseGraphiteSeries):
 
     def get_targets(self, interval_str=""):
         targets = []
+        # join all child series targets
         for series in self.series_list:
             targets += series.get_targets(interval_str=interval_str)
-        return targets
+        # remove duplicates (using a dict since lookup is a lot faster)
+        seen = {}
+        uniq_targets = []
+        for target in targets:
+            if target in seen:
+                continue
+            seen[target] = 1
+            uniq_targets.append(target)
+        return uniq_targets
 
     def _post_process_series(self, data, transform_null=None):
         new_data = {}

@@ -32,7 +32,7 @@ class Condition(OODictMongoMemcache):
     metric = StrField()
     operator = StrField()
     value = FloatField()
-    reminder_list = _IntList()  # in seconds
+    reminder_list = make_field(_IntList)()  # in seconds
 
     state = BoolField()
     state_since = FloatField()
