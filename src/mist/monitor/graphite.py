@@ -145,14 +145,37 @@ class BaseGraphiteSeries(object):
             raise GraphiteError(repr(exc))
 
         if not resp.ok:
+            # try to parse error message from graphite's HTML error response
             reason = ""
             try:
-                search = re.search("Exception: (.*)", resp.text)
+                search = re.search("(?:Exception|TypeError): (.*)", resp.text)
                 if search:
                     reason = search.groups()[0]
                     reason = HTMLParser.HTMLParser().unescape(reason)
             except:
                 pass
+            if reason == "reduce() of empty sequence with no initial value":
+                # This happens when graphite tries to perform certain
+                # calculation on an empty series. I think it is caused when
+                # using asPercent or divideSeries. The series is empty if it
+                # invalid, ie the graphite doesn't know of the underlying
+                # raw data series. This could be due to a typo in the target
+                # like saying oooctets instead of octets but since we have
+                # tested our targets and know they don't have any typos, the
+                # only other explanation is that the machine uuid (which is
+                # the top level identifier for a graphite series) is wrong.
+                # Practically, this happens if graphite has never recieved
+                # any data for this machine so it doesn't have any subseries
+                # registered. It happens when a machine has never sent data
+                # to graphite (perhaps collecd deployment went wrong) and
+                # we try to get the CpuUtilization or MemoryUtilization metric.
+                # If we try to get another metric, say Load, on such a target,
+                # we will get a 200 OK response but the asked target will be
+                # missing from the response body.
+                # TODO: send a query to "metrics?query=%s" % self.head
+                # to reveal if graphite knows the machine or not.
+                reason = ("Trying to do division in an invalid target, maybe "
+                          "the machine never sent Graphite any data.")
             log.error("Got error response from graphite: [%d] %s",
                       resp.status_code, reason or resp.text)
             raise GraphiteError(reason)

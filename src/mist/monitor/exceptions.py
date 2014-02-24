@@ -12,7 +12,7 @@ class MistError(Exception):
     http_code = 500
 
     def __init__(self, msg=None):
-        msg = "%s: %s" % (self.msg, msg) if msg is not None else self.msg
+        msg = "%s: %s" % (self.msg, msg) if msg else self.msg
         super(MistError, self).__init__(msg)
 
 
@@ -84,11 +84,11 @@ class InternalServerError(MistError):
     http_code = 500
 
 
+class GraphiteError(InternalServerError):
+    msg = "Error communicating with graphite"
+
+
 # SERVICE UNAVAILABLE (translated as 503 in views)
 class ServiceUnavailableError(MistError):
     msg = "Service unavailable"
     http_code = 503
-
-
-class GraphiteError(ServiceUnavailableError):
-    msg = "Error communicating with graphite"
