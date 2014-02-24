@@ -137,11 +137,8 @@ def get_stats(request):
         if target not in allowed_targets:
             raise BadRequestError("Bad target '%s'" % target)
 
-    # temporary hack for backwards compatibility with step given in ms
     if re.match("^[0-9]+(\.[0-9]+)?$", interval_str):
         interval_str = int(interval_str)
-        if interval_str >= 1000:
-            interval_str /= 1000
         interval_str = "%ssec" % (interval_str)
 
     return methods.get_stats(uuid, expression, start, stop, interval_str)
