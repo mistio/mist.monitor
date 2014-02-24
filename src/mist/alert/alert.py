@@ -54,6 +54,12 @@ OPERATORS_MAP = {
 
 
 def notify_core(condition, value):
+    """Send rule_triggered notification to mist.core.
+
+    Returns True on success, False otherwise.
+
+    """
+
     if not condition.state:
         log.debug("sending OK to core")
     else:
@@ -74,8 +80,16 @@ def notify_core(condition, value):
         'since': int(condition.state_since),
         'notification_level': condition.notification_level,
     }
-    resp = requests.put(config.CORE_URI + "/rules", params=params,
-                        verify=config.SSL_VERIFY)
+    try:
+        resp = requests.put(config.CORE_URI + "/rules", params=params,
+                            verify=config.SSL_VERIFY)
+    except Exception as exc:
+        log.error("Error sending notification to core: %r", exc)
+        return False
+    if not resp.ok:
+        log.error("Error sending notification to core: %s", resp.text)
+        return False
+    return True
 
 
 def check_condition(condition, series):
@@ -88,7 +102,13 @@ def check_condition(condition, series):
     if triggered != condition.state:
         condition.state = triggered
         condition.state_since = time()
-        condition.notification_level = 0
+        # if condition untriggered and no trigger notification previously sent,
+        # set level to 1 so that we don't send OK to core (in case condition
+        # uses custom reminder list where first notification happens later).
+        if not triggered and condition.notification_level == 0:
+            condition.notification_level = 1
+        else:
+            condition.notification_level = 0
         condition.save()
 
     # logs are gooood
@@ -106,12 +126,16 @@ def check_condition(condition, series):
         next_notification = reminder_list[condition.notification_level]
         if duration >= next_notification:
             log.info("    * sending WARNING to core")
-            notify_core(condition, value)
+            if not notify_core(condition, value):
+                # don't advance notification level if notification failed
+                return
             condition.notification_level += 1
             condition.save()
     elif not condition.state and not condition.notification_level:
         log.info("    * sending OK to core")
-        notify_core(condition, value)
+        if not notify_core(condition, value):
+            # don't advance notification level if notification failed
+            return
         condition.notification_level = 1
         condition.save()
 
@@ -142,6 +166,9 @@ def check_machine(machine, rule_id=''):
         if condition.operator not in OPERATORS_MAP:
             log.error("  * rule '%s' (%s):Unknown operator '%s'.",
                       rule_id, condition, condition.operator)
+            continue
+        if condition.active_after > time():
+            log.info("  * rule '%s' (%s):Not yet active.", rule_id, condition)
             continue
         conditions.append(condition)
     if not conditions:

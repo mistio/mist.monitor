@@ -33,6 +33,7 @@ class Condition(OODictMongoMemcache):
     operator = StrField()
     value = FloatField()
     reminder_list = make_field(_IntList)()  # in seconds
+    active_after = FloatField()  # timestamp
 
     state = BoolField()
     state_since = FloatField()
