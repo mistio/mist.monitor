@@ -125,14 +125,15 @@ def get_stats(request):
     uuid = request.matchdict['machine']
     params = request.params
     allowed_targets = ['cpu', 'load', 'memory', 'disk', 'network']
-    expression = params.get('expression',
-                            ['cpu', 'load', 'memory', 'disk', 'network'])
+    expression = params.get('expression')
     start = params.get('start')
     stop = params.get('stop')
     interval_str = params.get('step')
 
-    if isinstance(expression, basestring):
+    if expression and isinstance(expression, basestring):
         expression = expression.split(',')
+    if not expression:
+        expression = ['cpu', 'load', 'memory', 'disk', 'network']
     for target in expression:
         if target not in allowed_targets:
             raise BadRequestError("Bad target '%s'" % target)
