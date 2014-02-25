@@ -211,7 +211,7 @@ class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
     """The simplest case of a SingleGraphiteSeries, using a single target."""
 
     @abc.abstractproperty
-    def sum_function():
+    def sum_function(self):
         """Must be a string in ['sum', 'avg', 'max', 'min', 'last']."""
 
     @abc.abstractmethod
@@ -281,8 +281,8 @@ class CpuUtilSeries(SimpleSingleGraphiteSeries):
         # Calculate the sum of all time measurements
         total_sum = "sumSeries(%s.cpu-0.*)" % (self.head)
         # Calculate the derivative of each sum
-        first_set = "derivative(%s)" % (total_wo_idle_sum)
-        second_set = "derivative(%s)" % (total_sum)
+        first_set = "nonNegativeDerivative(%s)" % (total_wo_idle_sum)
+        second_set = "nonNegativeDerivative(%s)" % (total_sum)
         # Divide the first with the second sum (wo_idle_sum / total_sum)
         #target = "divideSeries(%s,%s)" % (first_set, second_set)
         target = "asPercent(%s,%s)" % (first_set, second_set)

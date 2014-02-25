@@ -42,7 +42,7 @@ class Condition(OODictMongoMemcache):
 
     def __init__(self, _dict=None, mongo_client=None, memcache_client=None):
         """Properly initialize OODictMongoMemcache for condition data."""
-        return super(Condition, self).__init__(
+        super(Condition, self).__init__(
             memcache_host=config.MEMCACHED_URI,
             mongo_uri=config.MONGO_URI,
             mongo_db='mist',
@@ -76,9 +76,7 @@ class Condition(OODictMongoMemcache):
             operator = "greater than"
         else:
             operator = "?"
-        return "%s %s %s" % (
-            self.metric, operator, self.value
-        )
+        return "%s %s %s" % (self.metric, operator, self.value)
 
 
 def get_condition_from_cond_id(cond_id):
@@ -109,7 +107,7 @@ class Machine(OODictMongoMemcacheLock):
 
     def __init__(self, _dict=None, mongo_client=None, memcache_client=None):
         """Properly initialize OODictMongo for machine data."""
-        return super(Machine, self).__init__(
+        super(Machine, self).__init__(
             memcache_host=config.MEMCACHED_URI,
             mongo_uri=config.MONGO_URI,
             mongo_db='mist',
