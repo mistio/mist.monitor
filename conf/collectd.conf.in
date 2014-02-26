@@ -21,13 +21,13 @@ LoadPlugin write_graphite
 LoadPlugin match_regex
 LoadPlugin target_set
 
-LoadPlugin rrdtool
+#LoadPlugin rrdtool
 #LoadPlugin write_mongodb
 
-<Plugin rrdtool>
-        DataDir "${buildout:directory}/var/rrd"
-        RandomTimeout 3
-</Plugin>
+#<Plugin rrdtool>
+#        DataDir "${buildout:directory}/var/rrd"
+#        RandomTimeout 3
+#</Plugin>
 
 <Plugin network>
 	# client setup:
@@ -52,7 +52,7 @@ LoadPlugin rrdtool
 <Plugin write_graphite>
   <Carbon>
     Host "localhost"
-    Port "2003"
+    Port "2013"
     Prefix "mist-"
     Postfix ""
     StoreRates false
@@ -62,5 +62,5 @@ LoadPlugin rrdtool
 </Plugin>
 
 
-Include "collectd.conf.local"
+Include "${buildout:directory}/conf/collectd.conf.local"
 
