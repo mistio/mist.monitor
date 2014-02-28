@@ -21,4 +21,7 @@ src/carbon/
 src/ceres/
 src/graphite-web/
 src/whisper/
+src/mist.alert/
 settings.py
+build/
+*.swp

@@ -1,269 +1,167 @@
 import os
+import re
+import logging
+import traceback
 from subprocess import call
 from time import time
-
-from logging import getLogger
 
 from pyramid.view import view_config
 from pyramid.response import Response
 
-from mist.monitor.stats import mongo_get_stats
-from mist.monitor.stats import graphite_get_stats, graphite_get_loadavg
-from mist.monitor.stats import dummy_get_stats
-from mist.monitor.rules import add_rule
-from mist.monitor.rules import remove_rule
+from mist.monitor import config
+from mist.monitor import methods
+from mist.monitor import graphite
+
+from mist.monitor.model import get_all_machines
+
+from mist.monitor.exceptions import MistError
+from mist.monitor.exceptions import RequiredParameterMissingError
+from mist.monitor.exceptions import MachineNotFoundError
+from mist.monitor.exceptions import ForbiddenError
+from mist.monitor.exceptions import UnauthorizedError
+from mist.monitor.exceptions import BadRequestError
 
 
-log = getLogger('mist.monitor')
+log = logging.getLogger(__name__)
+OK = Response("OK", 200)
+
+
+@view_config(context=Exception)
+def exception_handler_mist(exc, request):
+    """Here we catch exceptions and transform them to proper http responses
+
+    This is a special pyramid view that gets triggered whenever an exception
+    is raised from any other view. It catches all exceptions exc where
+    isinstance(exc, context) is True.
+
+    """
+
+    # non-mist exceptions. that shouldn't happen! never!
+    if not isinstance(exc, MistError):
+        trace = traceback.format_exc()
+        log.critical("Uncaught non-mist exception? WTF!\n%s", trace)
+        return Response("Internal Server Error", 500)
+
+    # mist exceptions are ok.
+    log.info("MistError: %r", exc)
+
+    # translate it to HTTP response based on http_code attribute
+    return Response(str(exc), exc.http_code)
 
 
 @view_config(route_name='machines', request_method='GET', renderer='json')
 def list_machines(request):
-    """Lists all machines with activated monitoring, for this mist.monitor
-    instance.
+    """Lists machines with monitoring.
+
+    Returns a dict with uuid's as keys and machine dicts as values.
+
     """
-    file = open(os.getcwd()+'/conf/collectd.passwd')
-    machines = file.read().split('\n')
+    return {machine.uuid: {'rules': [rule_id]}
+            for machine in get_all_machines()
+            for rule_id in machine.rules}
 
-    return machines
 
-
-@view_config(route_name='machines', request_method='PUT')
+@view_config(route_name='machine', request_method='PUT')
 def add_machine(request):
     """Adds machine to monitored list."""
-    uuid = request.params.get('uuid', None)
-    passwd = request.params.get('passwd', None)
-    log.debug("Adding machine %s to monitor list" % (uuid))
+    uuid = request.matchdict['machine']
+    passwd = request.params.get('passwd')
+    log.info("Adding machine %s to monitor list" % (uuid))
+    if not passwd:
+        raise RequiredParameterMissingError('passwd')
 
-    if not uuid or not passwd:
-        return Response('Unauthorized', 401)
-
-    # check if uuid already in pass file
-    try:
-        f = open(os.getcwd()+"/conf/collectd.passwd")
-        res = f.read()
-        f.close()
-        if uuid in res:
-            return Response('Conflict', 409)
-
-    except Exception as e:
-        log.warn('Error opening machines pw file: %s' % e)
-        log.warn('Maybe it is our first time here, so we touch the file')
-
-    try:
-        # append collectd pw file
-        f = open(os.getcwd()+"/conf/collectd.passwd", 'a')
-        f.writelines(['\n'+ uuid + ': ' + passwd])
-        f.close()
-    except Exception as e:
-        log.warn('Error creating machines pw file: %s' % e)
-        return Response('Service unavailable', 503)
-
-    # create new collectd conf section for allowing machine stats
-    config_append = """PreCacheChain "%sRule"
-        <Chain "%sRule">
-            <Rule "rule">
-                <Match "regex">
-                    Host "^%s$"
-                </Match>
-                Target return
-            </Rule>
-            Target continue
-        </Chain>
-        """ % (uuid, uuid, uuid)
-
-    try:
-        f = open(os.getcwd()+"/conf/collectd_%s.conf"%uuid,"w")
-        f.write(config_append)
-        f.close()
-
-        # include the new file in the main config
-        config_include = os.getcwd()+"/conf/collectd_%s.conf" % uuid
-        f = open(os.getcwd()+"/conf/collectd.conf.local", "a")
-        f.write('\nInclude "%s"\n'% config_include)
-        f.close()
-    except Exception as e:
-        log.error('Error opening collectd conf files: %s' % e)
-        return Response('Service unavailable', 503)
-
-    try:
-        call(['/usr/bin/pkill','-HUP','collectd'])
-    except Exception as e:
-        log.error('Error restarting collectd: %s' % e)
-
-    return Response('Success', 200)
+    methods.add_machine(uuid, passwd)
+    return OK
 
 
 @view_config(route_name='machine', request_method='DELETE')
 def remove_machine(request):
     """Removes machine from monitored list."""
     uuid = request.matchdict['machine']
-    log.debug("Removing machine %s from monitor list" % (uuid))
+    log.info("Removing machine %s from monitor list" % (uuid))
 
-    if not uuid:
-        return Response('Bad Request', 400)
-
-    try:
-        f = open(os.getcwd()+"/conf/collectd.passwd")
-        res = f.read()
-        f.close()
-        if uuid not in res:
-           return Response('Not Found', 404)
-        lines = res.split('\n')
-        for l in lines:
-            if uuid in l:
-                lines.remove(l)
-        res = '\n' .join(lines)
-        f = open(os.getcwd()+"/conf/collectd.passwd",'w')
-        f.write(res)
-        f.close()
-    except Exception as e:
-        log.error('Error opening machines pw file: %s' % e)
-        return Response('Service unavailable', 503)
-
-    try:
-        f = open(os.getcwd()+"/conf/collectd.conf.local")
-        res = f.read()
-        f.close()
-        if uuid not in res:
-           return Response('Not Found', 404)
-        lines = res.split('\n')
-        for l in lines:
-            if uuid in l:
-                lines.remove(l)
-        res = '\n' .join(lines)
-        f = open(os.getcwd()+"/conf/collectd.conf.local",'w')
-        f.write(res)
-        f.close()
-    except Exception as e:
-        log.error('Error opening collectd conf file: %s' % e)
-        return Response('Service unavailable', 503)
-
-    filename = "/conf/galerts-%s.yaml" % uuid
-    try:
-        os.remove(os.getcwd()+filename)
-    except Exception as e:
-        log.error('Error removing alert file: %s' % e)
-
-    return Response('Success', 200)
+    methods.remove_machine(uuid)
+    return OK
 
 
-@view_config(route_name='rules', request_method='PUT', renderer='json')
-def update_rules(request):
+@view_config(route_name='rule', request_method='PUT')
+def add_rule(request):
+    """Add or update rule.
 
-    backend = request.registry.settings['backend']
-    core = request.registry.settings['core']
-    host = backend['host']
-    port = backend['port']
-    core_host = core['host']
-    core_port = core['port']
-    try:
-        params = request.json_body
-        metric = params.get('metric', None)
-        log.error(params)
-        if metric in ['network-tx', 'disk-write']:
-            params['value'] = float(params['value']) * 1000
-        action = params.get('rule_action', None)
-        params['host'] = host
-        params['port'] = port
-        params['core_host'] = core_host
-        params['core_port'] = core_port
-        if 'add' in action:
-            ret = add_rule(params)
-        else:
-            ret = remove_rule(params)
-        if ret:
-            log.error('rule action failed, ret = %d' % ret)
-            return Response('Bad Request', 400)
-    except Exception as e:
-        log.warn('Error %s' % e)
-        return Response('Bad Request', 400)
+    This will create a new condition that will start being checked with clear
+    history, even if the rule is not actually being changed.
 
-    log.debug('rule action %s, ret = %d' % (action, ret))
-    return Response('Success', 200)
-
-
-@view_config(route_name='loadavg', request_method='GET', renderer='json')
-def get_loadavg(request):
-    """Returns a load avg png
     """
-    backend = request.registry.settings['backend']
     uuid = request.matchdict['machine']
-    params = request.params
-    start = params.get('start', time() - 3600)
-    step = params.get('step', 10)
-    print start, step
+    rule_id = request.matchdict['rule']
 
-    if not uuid:
-        return Response('Bad Request', 400)
+    params = request.json_body
+    for key in ["metric", "operator", "value"]:
+        if not params.get(key):
+            raise RequiredParameterMissingError(key)
+    metric = params["metric"]
+    operator = params["operator"]
+    value = params["value"]
+    reminder_list = params.get("reminder_list")
+    if metric in ['network-tx', 'disk-write']:
+        value = float(value) * 1000
 
-    host = backend['host']
-    port = backend['port']
+    methods.add_rule(uuid, rule_id, metric, operator, value, reminder_list)
+    return OK
 
-    if not uuid:
-        log.error("cannot find uuid %s" % uuid)
-        return Response('Bad Request', 400)
-    
-    resp = graphite_get_loadavg(host, port, uuid, start, step)
-
-    return resp
+@view_config(route_name='rule', request_method='DELETE')
+def remove_rule(request):
+    """Removes rule and corresponding condition."""
+    uuid = request.matchdict['machine']
+    rule_id = request.matchdict['rule']
+    methods.remove_rule(uuid, rule_id)
+    return OK
 
 
 @view_config(route_name='stats', request_method='GET', renderer='json')
 def get_stats(request):
-    """Returns all stats for a machine, the client will draw them.
+    """Returns all stats for a machine, the client will draw them."""
 
-    You can configure which monitoring backend to use in mist.io.config. The
-    available backends are 'mongodb', 'graphite' and 'dummy'.
-
-    .. warning:: Only mongodb works with the current version of the client
-    """
     uuid = request.matchdict['machine']
+    params = request.params
+    allowed_targets = ['cpu', 'load', 'memory', 'disk', 'network']
+    expression = params.get('expression')
+    start = params.get('start')
+    stop = params.get('stop')
+    interval_str = params.get('step')
 
-    if not uuid:
-        log.error("cannot find uuid %s" % uuid)
-        return Response('Bad Request', 400)
-
-    allowed_expression = ['cpu', 'load', 'memory', 'disk', 'network']
-
-    expression = request.params.get('expression',
-                                    ['cpu', 'load', 'memory', 'disk', 'network'])
-    if expression.__class__ in [str,unicode]:
-        #expression = [expression]
+    if expression and isinstance(expression, basestring):
         expression = expression.split(',')
-
+    if not expression:
+        expression = ['cpu', 'load', 'memory', 'disk', 'network']
     for target in expression:
-        if target not in allowed_expression:
-            log.error("expression error '%s'" % target)
-            return Response('Bad Request', 400)
+        if target not in allowed_targets:
+            raise BadRequestError("Bad target '%s'" % target)
 
-    # step comes from the client in millisecs, convert it to secs
-    step = int(request.params.get('step', 10000))
-    if (step >= 5000):
-        step = int(step/1000)
-    elif step == 0:
-        log.warn("We got step == 0, maybe the client is broken ;S, using default")
-        step = 60
-    else:
-        log.warn("We got step < 1000, maybe the client meant seconds ;-)")
+    if re.match("^[0-9]+(\.[0-9]+)?$", interval_str):
+        interval_str = int(interval_str)
+        interval_str = "%ssec" % (interval_str)
 
-    stop = int(request.params.get('stop', int(time())))
-    start = int(request.params.get('start', stop - step))
+    return methods.get_stats(uuid, expression, start, stop, interval_str)
 
-    stats = {}
-    backend = request.registry.settings['backend']
-    if backend['type'] == 'mongodb':
-        stats = mongo_get_stats(backend, uuid, expression, start, stop, step)
-    elif backend['type'] == 'graphite':
-        host = backend['host']
-        port = backend['port']
-        stats = graphite_get_stats(host, port, uuid, expression, start, stop, step)
-    elif backend['type'] == 'dummy':
-        stats = dummy_get_stats(expression, start, stop, step)
-    else:
-        log.error('Requested invalid monitoring backend: %s' % backend)
-        return Response('Service unavailable', 503)
 
-    #log.debug("uuid = %s, expression = %s, start = %d, stop = %d, step = %d" % (uuid, expression, start, stop, step))
-    #log.debug(stats)
-    return stats
+@view_config(route_name='reset', request_method='POST')
+def reset_hard(request):
+    """Reset mist.monitor with data provided from mist.core
+
+    This is a special view that will cause monitor to drop all known data
+    for machines, rules and conditions, will repopulate itself with the data
+    provided in the request and will restart collectd and mist.alert.
+
+    For security reasons, a special non empty key needs to be specified in
+    settings.py and sent along with the reset request.
+
+    """
+    params = request.json_body
+    key, data = params.get('key'), params.get('data', {})
+    if not config.RESET_KEY:
+        raise ForbiddenError("Reset functionality not enabled.")
+    if key != config.RESET_KEY:
+        raise UnauthorizedError("Wrong reset key provided.")
+    methods.reset_hard(params['data'])
+    return OK

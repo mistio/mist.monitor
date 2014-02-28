@@ -39,7 +39,7 @@ priority = 20
 redirect_stderr = false
 
 [program:mongodb]
-command = ${buildout:directory}/bin/start_master.sh
+command = ${buildout:directory}/bin/mongod  --journal --dbpath ${buildout:directory}/var/data --bind_ip 127.0.0.1 --master --port 27022 --nohttpinterface --logpath ${buildout:directory}/var/log/mongodb.log --directoryperdb
 process_name = mongodb
 directory = ${buildout:directory}/bin
 priority = 30
@@ -51,3 +51,11 @@ process_name = alert
 directory = ${buildout:directory}
 priority = 40
 redirect_stderr = false
+
+[program:memcache]
+command = ${buildout:directory}/bin/memcached  -l 127.0.0.1 -u mist
+process_name = memcache
+directory = ${buildout:directory}/bin
+priority = 25
+redirect_stderr = false
+
