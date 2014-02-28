@@ -1,7 +1,8 @@
 """User defined settings"""
 
-#GRAPHITE_URI = "http://graphite.mist.io"
 #CORE_URI = "https://mist.io"
+# Almost all servers either run graphite locally or have a local graphite proxy
+#GRAPHITE_URI = "http://localhost"
 #MONGO_URI = "localhost:27022"
 #MEMCACHED_URI = ["localhost:11211"]
 
