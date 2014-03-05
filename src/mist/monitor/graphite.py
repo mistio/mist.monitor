@@ -319,8 +319,8 @@ class NetSeries(SimpleSingleGraphiteSeries):
 
     alias = "net"
     sum_function = "avg"
-    direction = "*"
-    iface = "*"
+    direction = "*"  # '*', 'rx', 'tx'
+    iface = "*"  # '*', 'eth0', 'eth*' etc
 
     def __init__(self, uuid, alias="", iface="", direction=""):
         if iface:
@@ -330,9 +330,14 @@ class NetSeries(SimpleSingleGraphiteSeries):
         super(NetSeries, self).__init__(uuid, alias=alias)
 
     def get_inner_target(self):
-        return "scaleToSeconds(nonNegativeDerivative(sumSeries(%s.interface-%s.if_octets.%s)),1)" % (
-            self.head, self.iface, self.direction
-        )
+        # collectd version 4.10 uses 'interface.if_octets-eth0' format
+        # collectd version 5.1  uses 'interface-eth0.if_octets' format
+        # we use the {-eth0,} filter in both places to catch both cases
+        raw_series = "%s.interface{-%s,}.if_octets{-%s,}.%s" % \
+            (self.head, self.iface, self.iface, self.direction)
+        net_util = "scaleToSeconds(sumSeries(nonNegativeDerivative(%s)),1)" % \
+            (raw_series, )
+        return net_util
 
 
 class NetRxSeries(NetSeries):
