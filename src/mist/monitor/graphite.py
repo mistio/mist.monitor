@@ -356,8 +356,8 @@ class NetAllSeries(CombinedGraphiteSeries):
     """NetAllSeries merges NetRxSeries and NetTxSeries."""
 
     def __init__(self, uuid):
-        series_list = [NetRxSeries(uuid, iface='eth0'),
-                       NetTxSeries(uuid, iface='eth0')]
+        series_list = [NetRxSeries(uuid, iface='eth*'),
+                       NetTxSeries(uuid, iface='eth*')]
         super(NetAllSeries, self).__init__(uuid, series_list)
 
     def _post_process_series(self, data, transform_null=None):
