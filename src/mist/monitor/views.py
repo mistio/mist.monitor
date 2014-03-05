@@ -104,7 +104,7 @@ def add_rule(request):
     value = params["value"]
     reminder_list = params.get("reminder_list")
     if metric in ['network-tx', 'disk-write']:
-        value = float(value) * 1000
+        value = float(value) * 1024  # network-tx and disk-write are sent in KB/s
 
     methods.add_rule(uuid, rule_id, metric, operator, value, reminder_list)
     return OK
