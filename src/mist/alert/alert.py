@@ -64,6 +64,10 @@ def notify_core(condition, value):
         log.debug("sending OK to core")
     else:
         log.debug("sending WARNING to core")
+
+    if condition.metric in ('network-tx', 'disk-write'):
+        value = value / 1024  # this metrics are sent and received in KB/s
+
     log.debug("uuid:%s", condition.uuid)
     log.debug("rule_id:%s", condition.rule_id)
     log.debug("condition:%s", condition)
