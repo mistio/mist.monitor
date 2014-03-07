@@ -185,19 +185,60 @@ def check_machine(machine, rule_id=''):
     }
     combined_series = CombinedGraphiteSeries(machine.uuid,
                                              conditions_series.values())
-    try:
-        data = combined_series.get_series("-1min")  #(int(time() - 70))
-    except GraphiteError as exc:
-        log.warning("%r", exc)
-        return
+
+    for since in ("-70sec", "-100sec"):
+        try:
+            data = combined_series.get_series(since)  #(int(time() - 70))
+        except GraphiteError as exc:
+            log.warning("%r", exc)
+            return
+
+        # find out actual number of measurements
+        # to account for small clock skew
+        #max_length = max((len(series) for series in data.values()))
+        metrics_num = len(data)
+        if 'nodata' in data:
+            metrics_num -= 1
+        if metrics_num:
+            try:
+                min_length = min((len(series) for alias, series in data.items()
+                                  if alias != 'nodata' and len(series)))
+            except ValueError:
+                min_length = 0
+            measurements = min_length
+            if measurements >= 3:
+                break
+        else:
+            # only nodata alert
+            break
+        log.warning("  * '%s' didn't bring enough values, "
+                    "maybe machine down or time skew", since)
+        # if we got less than 3 measurements, retry with larger 'since' param
 
     # check all conditions
     for condition in conditions:
-        condition_series = data[conditions_series[condition.cond_id].alias]
-        if not condition_series:
-            log.warning("  * rule '%s' (%s):No data for rule.",
-                        condition.rule_id, condition)
-            continue
+        alias = conditions_series[condition.cond_id].alias
+        condition_series = data[alias]
+        if alias == 'nodata':
+            nodata_values = [value for timestamp, value in data['nodata']]
+            measurements = len(nodata_values) - sum(nodata_values)
+            if measurements > 0 and measurements < 3:
+                # don't change nodata rule's state when we only received
+                # one or two measurements to avoid continuous state
+                # switching due to time skew on the monitored machine
+                log.warning("  * rule '%s' (%s):Only got %d non-nulls, "
+                            "entering dangerous zone, skipping.",
+                            condition.rule_id, condition, measurements)
+                continue
+        else:
+            if not condition_series:
+                log.warning("  * rule '%s' (%s):No data for rule.",
+                            condition.rule_id, condition)
+                continue
+            elif len(condition_series) < 3:
+                log.warning("  * rule '%s' (%s):Not enough data(%d) for rule.",
+                            condition.rule_id, condition, len(condition_series))
+                continue
         check_condition(condition, condition_series)
 
 
