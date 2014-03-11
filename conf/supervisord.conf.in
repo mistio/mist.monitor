@@ -31,6 +31,13 @@ directory = ${buildout:directory}
 priority = 10
 redirect_stderr = false
 
+[program:bucky]
+command = ${buildout:directory}/bin/bucky ${buildout:directory}/conf/bucky_conf.py
+process_name = bucky
+directory = ${buildout:directory}
+priority = 15
+redirect_stderr = false
+
 [program:collectd]
 command =  ${buildout:directory}/parts/collectd/sbin/collectd -f -C ${buildout:directory}/conf/collectd.conf
 process_name = collectd
