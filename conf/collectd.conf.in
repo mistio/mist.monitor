@@ -2,53 +2,57 @@ FQDNLookup true
 Interval 10
 Timeout 2
 ReadThreads 5
-#
-PIDFile "${buildout:directory}/var/collectd.pid"
-LoadPlugin logfile
 
+PIDFile "${buildout:directory}/var/collectd.pid"
+
+LoadPlugin logfile
 <Plugin logfile>
-	LogLevel "debug"
-	File STDOUT
-	Timestamp true
-	PrintSeverity false
+    LogLevel "debug"
+    File STDOUT
+    Timestamp true
+    PrintSeverity false
 </Plugin>
 
-LoadPlugin network
-LoadPlugin write_graphite
 <LoadPlugin perl>
-	Globals true
+    Globals true
 </LoadPlugin>
 LoadPlugin match_regex
 LoadPlugin target_set
 
 #LoadPlugin rrdtool
-#LoadPlugin write_mongodb
-
 #<Plugin rrdtool>
 #        DataDir "${buildout:directory}/var/rrd"
 #        RandomTimeout 3
 #</Plugin>
 
+LoadPlugin network
 <Plugin network>
-	# client setup:
-	<Listen "0.0.0.0" "25826">
-		SecurityLevel Encrypt
-		AuthFile "${buildout:directory}/conf/collectd.passwd"
-		Interface "eth0"
-	</Listen>
-	MaxPacketSize 1024
-	ReportStats true
-	CacheFlush 1800
+    # server
+    <Listen "0.0.0.0" "25826">
+        SecurityLevel Encrypt
+        AuthFile "${buildout:directory}/conf/collectd.passwd"
+        Interface "eth0"
+        MaxPacketSize 1024
+        ReportStats true
+        CacheFlush 1800
+    </Listen>
+    # client
+    Server "127.0.0.1" "25827"
+    # proxy
+    Forward true
 </Plugin>
 
+#LoadPlugin write_mongodb
 #<Plugin write_mongodb>
-#	<Node "local">
-#		Host "127.0.0.1"
-#		Port "27022"
-#		Timeout 1000
-#		StoreRates false
-#	</Node>
+#    <Node "local">
+#        Host "127.0.0.1"
+#        Port "27022"
+#        Timeout 1000
+#        StoreRates false
+#    </Node>
 #</Plugin>
+
+LoadPlugin write_graphite
 <Plugin write_graphite>
   <Carbon>
     Host "localhost"
