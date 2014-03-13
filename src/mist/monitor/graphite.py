@@ -183,7 +183,7 @@ class BaseGraphiteSeries(object):
                     reason = ("Trying to do division with empty series, "
                               "the target must be wrong.")
                 else:
-                    reason = ("Trying to do division with empty series, cause"
+                    reason = ("Trying to do division with empty series, cause "
                               "the machine never sent Graphite any data.")
             log.error("Got error response from graphite: [%d] %s",
                       resp.status_code, reason or resp.text)

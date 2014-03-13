@@ -14,6 +14,8 @@ from mist.monitor.graphite import MemSeries
 from mist.monitor.graphite import DiskWriteSeries
 from mist.monitor.graphite import NetTxSeries
 
+from mist.monitor.helpers import tdelta_to_str
+
 from mist.monitor.exceptions import ConditionNotFoundError
 from mist.monitor.exceptions import GraphiteError
 
@@ -118,7 +120,11 @@ def check_condition(condition, series):
     # logs are gooood
     since_str = "always"
     if condition.state_since:
-        since_str = "%d secs ago" % (time() - condition.state_since)
+        since_str = tdelta_to_str(time() - condition.state_since)
+        if since_str:
+            since_str += " ago"
+        else:
+            since_str = "just now"
     log.info("  * rule '%s' (%s):%s since %s (value=%s, level=%d)",
              condition.rule_id, condition, condition.state, since_str,
              value, condition.notification_level)
@@ -155,7 +161,8 @@ def check_machine(machine, rule_id=''):
 
     # check if machine activated
     if not machine.activated:
-        log.info("  * Machine is not yet activated.")
+        log.info("  * Machine is not yet activated (inactive for %s).",
+                 tdelta_to_str(time()-machine.enabled_time))
         nodata_series = NoDataSeries(machine.uuid)
         if nodata_series.check_head():
             log.info("  * Machine just got activated!")
