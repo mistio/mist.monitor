@@ -153,6 +153,21 @@ def check_machine(machine, rule_id=''):
 
     log.info("Checking machine '%s':", machine.uuid)
 
+    # check if machine activated
+    if not machine.activated:
+        log.info("  * Machine is not yet activated.")
+        nodata_series = NoDataSeries(machine.uuid)
+        if nodata_series.check_head():
+            log.info("  * Machine just got activated!")
+            with machine.lock_n_load():
+                machine.activated = True
+                machine.save()
+                for rule_id in machine.rules:
+                    condition = machine.get_condition(rule_id)
+                    condition.active_after = time() + 30
+                    condition.save()
+        return
+
     # gather all conditions
     conditions = []
     rules = [rule_id] if rule_id else machine.rules

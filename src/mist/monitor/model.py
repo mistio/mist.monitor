@@ -103,6 +103,10 @@ class Machine(OODictMongoMemcacheLock):
     uuid = StrField()
 
     collectd_password = StrField()
+
+    enabled_time = FloatField()
+    activated = BoolField()
+
     rules = make_field(Rules)()
 
     def __init__(self, _dict=None, mongo_client=None, memcache_client=None):

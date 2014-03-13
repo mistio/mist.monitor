@@ -73,11 +73,13 @@ def add_machine(uuid, password, update_collectd=True):
         ## raise MachineExistsError(uuid)
         with machine.lock_n_load():
             machine.collectd_password = password
+            machine.enabled_time = time()
             machine.save()
     else:
         machine = Machine()
         machine.uuid = uuid
         machine.collectd_password = password
+        machine.enabled_time = time()
         machine.create()
 
     # Create new collectd conf to make collectd only accept data for a certain
