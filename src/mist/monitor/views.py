@@ -154,8 +154,9 @@ def get_cross_graphs(request):
     start = params.get('start')
     stop = params.get('stop')
     interval_str = params.get('interval_str')
+    diff = bool(params.get('diff'))
 
-    img = methods.get_cross_graphs(uuid, metric, start, stop, interval_str)
+    img = methods.get_cross_graphs(uuid, metric, start, stop, interval_str, diff=diff)
     return Response(img, content_type='image/png', request=request)
 
 
