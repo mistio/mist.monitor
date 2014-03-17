@@ -245,9 +245,9 @@ def get_cross_graphs(uuid, metric, start="", stop="", interval_str="", diff=Fals
     items.append(('width', 586))
     items.append(('height', 308))
     if start:
-        items.append(('start', start))
+        items.append(('from', start))
     if stop:
-        items.append(('stop', stop))
+        items.append(('until', stop))
     params_str = "&".join(["%s=%s" % (item[0], item[1]) for item in items])
     uri = "%s/render?%s" % (config.GRAPHITE_URI, params_str)
     log.info("cross graphs uri: %s", uri)
