@@ -4,6 +4,7 @@ import logging
 from subprocess import call
 from time import time
 
+from mist.monitor import config
 from mist.monitor import graphite
 
 from mist.monitor.helpers import get_rand_token
@@ -205,7 +206,7 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
         series_list.append(allowed_targets[metric](uuid))
     series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
     return series.get_series(start, stop, interval_str=interval_str,
-                             transform_null=False)
+                             transform_null=False, bucky=config.GRAPHS_BUCKY)
 
 
 def reset_hard(data):

@@ -52,3 +52,7 @@
 # string and sent along with a reset http request from core. Under normal
 # circumstances it should be left blank for security reasons.
 #RESET_KEY = ""
+
+# Switch graphs/alerts to bucky
+#GRAPHS_BUCKY = False
+#ALERTS_BUCKY = False

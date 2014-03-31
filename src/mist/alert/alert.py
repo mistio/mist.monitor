@@ -188,7 +188,7 @@ def check_machine(machine, rule_id=''):
 
     for since in ("-70sec", "-100sec"):
         try:
-            data = combined_series.get_series(since)  #(int(time() - 70))
+            data = combined_series.get_series(since, bucky=config.ALERTS_BUCKY)
         except GraphiteError as exc:
             log.warning("%r", exc)
             return
