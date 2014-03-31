@@ -78,7 +78,12 @@ class BaseGraphiteSeries(object):
 
         targets = self.get_targets(interval_str=interval_str, bucky=bucky)
         uri = self._construct_graphite_uri(targets, start, stop)
-        data = self._graphite_request(uri, filter_from=filter_from)
+        resp = self._graphite_request(uri, bucky=bucky)
+        data = resp.json()
+        if filter_from:
+            for item in data:
+                item['datapoints'] = [point for point in item['datapoints']
+                                      if point[1] >= filter_from]
         return self._post_process_series(data, transform_null=transform_null)
 
     def _post_process_series(self, data, transform_null=None):
@@ -124,7 +129,7 @@ class BaseGraphiteSeries(object):
             uri += "&until=%s" % stop
         return uri
 
-    def _graphite_request(self, uri, filter_from=0, use_session=True):
+    def _graphite_request(self, uri, use_session=True, bucky=False):
         """Issue a request to graphite."""
 
         global REQ_SESSION
@@ -177,18 +182,27 @@ class BaseGraphiteSeries(object):
                 # missing from the response body.
                 # TODO: send a query to "metrics?query=%s" % self.head()
                 # to reveal if graphite knows the machine or not.
-                reason = ("Trying to do division in an invalid target, maybe "
-                          "the machine never sent Graphite any data.")
+                if self.check_head(bucky=bucky):
+                    reason = ("Trying to do division with empty series, "
+                              "the target must be wrong.")
+                else:
+                    reason = ("Trying to do division with empty series, cause "
+                              "the machine never sent Graphite any data.")
             log.error("Got error response from graphite: [%d] %s",
                       resp.status_code, reason or resp.text)
             raise GraphiteError(reason)
+        return resp
 
-        raw_data = resp.json()
-        if filter_from:
-            for item in raw_data:
-                item['datapoints'] = [point for point in item['datapoints']
-                                      if point[1] >= filter_from]
-        return raw_data
+    def get_metrics(self, expression="", bucky=False):
+        query = self.head(bucky=bucky)
+        if expression:
+            query += ".%s" % (expression)
+        url = "%s/metrics?query=%s" % (config.GRAPHITE_URI, query)
+        resp = self._graphite_request(url)
+        return resp.json()
+
+    def check_head(self, bucky=False):
+        return bool(self.get_metrics(bucky=bucky))
 
 
 class SingleGraphiteSeries(BaseGraphiteSeries):
