@@ -37,6 +37,7 @@ process_name = bucky
 directory = ${buildout:directory}
 priority = 15
 redirect_stderr = false
+autorestart = true
 
 [program:collectd]
 command =  ${buildout:directory}/parts/collectd/sbin/collectd -f -C ${buildout:directory}/conf/collectd.conf
