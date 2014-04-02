@@ -375,7 +375,7 @@ class NetSeries(SimpleSingleGraphiteSeries):
         return net_util
 
     def get_inner_target_bucky(self):
-        return "%s.interface.%s.if_octets.%s" % (
+        return "sumSeries(%s.interface.%s.if_octets.%s)" % (
             self.head(bucky=True), self.iface, self.direction
         )
 
