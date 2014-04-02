@@ -15,3 +15,5 @@ $ ./bin/graphite syncdb --settings=graphite.settings
 
 (install collectd-graphite by hand as explained here:https://github.com/joemiller/collectd-graphite)
 
+Start supervisord with sudo (collectd requires root)
+
