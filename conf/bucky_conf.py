@@ -3,6 +3,7 @@
 # Standard debug and log level
 #debug = False
 log_level = "DEBUG"  # "INFO"
+log_fmt = "%(asctime)s [%(levelname)s] %(module)s - %(message)s"
 
 # Whether to print the entire stack trace for errors encountered
 # when loading the config file
