@@ -180,8 +180,6 @@ class BaseGraphiteSeries(object):
                 # If we try to get another metric, say Load, on such a target,
                 # we will get a 200 OK response but the asked target will be
                 # missing from the response body.
-                # TODO: send a query to "metrics?query=%s" % self.head()
-                # to reveal if graphite knows the machine or not.
                 if self.check_head(bucky=bucky):
                     reason = ("Trying to do division with empty series, "
                               "the target must be wrong.")
@@ -193,16 +191,33 @@ class BaseGraphiteSeries(object):
             raise GraphiteError(reason)
         return resp
 
-    def get_metrics(self, expression="", bucky=False):
-        query = self.head(bucky=bucky)
-        if expression:
-            query += ".%s" % (expression)
+    def _find_metrics(self, query):
         url = "%s/metrics?query=%s" % (config.GRAPHITE_URI, query)
         resp = self._graphite_request(url)
         return resp.json()
 
     def check_head(self, bucky=False):
-        return bool(self.get_metrics(bucky=bucky))
+        return bool(self._find_metrics(self.head(bucky=bucky)))
+
+    def find_metrics(self, strip_head=False, bucky=False):
+        def find_leaves(query):
+            leaves = []
+            for metric in self._find_metrics(query):
+                if metric['leaf']:
+                    leaves.append(metric['id'])
+                elif metric['allowChildren']:
+                    # or metric['expandable']
+                    leaves += find_leaves(metric['id'] + ".*")
+            return leaves
+
+        query = "%s.*" % self.head(bucky=bucky)
+        leaves = find_leaves(query)
+        if strip_head:
+            prefix = "%s." % self.head(bucky=bucky)
+            for i in range(len(leaves)):
+                if leaves[i].startswith(prefix):
+                    leaves[i] = leaves[i][len(prefix):]
+        return leaves
 
 
 class SingleGraphiteSeries(BaseGraphiteSeries):

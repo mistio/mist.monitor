@@ -160,6 +160,12 @@ def get_cross_graphs(request):
     return Response(img, content_type='image/png', request=request)
 
 
+@view_config(route_name='find_metrics', request_method='GET', renderer='json')
+def find_metrics(request):
+    uuid = request.matchdict['machine']
+    return methods.find_metrics(uuid)
+
+
 @view_config(route_name='reset', request_method='POST')
 def reset_hard(request):
     """Reset mist.monitor with data provided from mist.core

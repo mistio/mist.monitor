@@ -263,6 +263,11 @@ def get_cross_graphs(uuid, metric, start="", stop="", interval_str="", diff=Fals
     return resp.content
 
 
+def find_metrics(uuid):
+    series = graphite.LoadSeries(uuid)
+    return series.find_metrics(strip_head=True, bucky=config.GRAPHS_BUCKY)
+
+
 def reset_hard(data):
     """Reset mist.monitor data.
 
