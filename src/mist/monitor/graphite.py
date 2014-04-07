@@ -214,9 +214,7 @@ class BaseGraphiteSeries(object):
         leaves = find_leaves(query)
         if strip_head:
             prefix = "%s." % self.head(bucky=bucky)
-            for i in range(len(leaves)):
-                if leaves[i].startswith(prefix):
-                    leaves[i] = leaves[i][len(prefix):]
+            leaves = [leaf.replace(prefix, "%(head)s.") for leaf in leaves]
         return leaves
 
 
