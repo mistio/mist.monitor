@@ -15,6 +15,25 @@ REQ_SESSION = None
 log = logging.getLogger(__name__)
 
 
+def summarize(series, interval, function):
+    return "summarize(%s,'%s','%s')" % (series, interval, function)
+
+
+def sum_series(series_list):
+    return "sumSeries(%s)" % series_list
+
+
+def as_percent(series_list, total=None):
+    if total:
+        return "asPercent(%s,%s)" % (series_list, total)
+    else:
+        return "asPercent(%s) % series_list"
+
+
+def exclude(series_list, regex):
+    return "exclude(%s,'%s')" % (series_list, regex)
+
+
 class BaseGraphiteSeries(object):
     """Base graphite target class that defines an interface and provides
     convenience methods for subclasses to use."""
@@ -25,15 +44,12 @@ class BaseGraphiteSeries(object):
         """A uuid is required to initialize the class."""
         self.uuid = uuid
 
-    def head(self, bucky=False):
+    def head(self):
         """Top level data target."""
-        if not bucky:
-            return "mist-%s" % self.uuid
-        else:
-            return "bucky.%s" % self.uuid
+        return "bucky.%s" % self.uuid
 
     @abc.abstractmethod
-    def get_targets(self, interval_str='', bucky=False):
+    def get_targets(self, interval_str=''):
         """Return list of target strings.
 
         If interval_str specified, summarize targets accordingly.
@@ -41,15 +57,11 @@ class BaseGraphiteSeries(object):
         """
         return []
 
-    def get_series(self, start="", stop="", interval_str="",
-                   transform_null=None, bucky=False):
+    def get_series(self, start="", stop="", interval_str=""):
         """Get time series from graphite.
 
         Optional start and stop parameters define time range.
-        transform_null defines handling of null values in graphite.
-            If transform_null=False, null's are left in place (as None's)
-            If transform_null=None, null's are stripped
-            If transform_null=value, null values are replaced by value.
+
         """
 
         # if start is a timestamp
@@ -76,49 +88,18 @@ class BaseGraphiteSeries(object):
         else:
             filter_from = 0
 
-        targets = self.get_targets(interval_str=interval_str, bucky=bucky)
+        targets = self.get_targets(interval_str=interval_str)
         uri = self._construct_graphite_uri(targets, start, stop)
-        resp = self._graphite_request(uri, bucky=bucky)
+        resp = self._graphite_request(uri)
         data = resp.json()
         if filter_from:
             for item in data:
                 item['datapoints'] = [point for point in item['datapoints']
                                       if point[1] >= filter_from]
-        return self._post_process_series(data, transform_null=transform_null)
+        return self._post_process_series(data)
 
-    def _post_process_series(self, data, transform_null=None):
-        """Change to (timestamp, value) pairs and process null values.
-
-        transform_null defines handling of null values in graphite.
-            If transform_null=False, null's are left in place (as None's)
-            If transform_null=None, null's are stripped
-            If transform_null=value, null values are replaced by value.
-
-        """
-
-        new_data = {}
-        if transform_null is None:
-            # strip null values
-            for item in data:
-                target = item['target']
-                new_data[target] = [(timestamp, value)
-                                    for value, timestamp in item['datapoints']
-                                    if value is not None]
-        elif transform_null is False:
-            # leave null's as is (None's)
-            for item in data:
-                target = item['target']
-                new_data[target] = [(timestamp, value)
-                                    for value, timestamp in item['datapoints']]
-        else:
-            # transform null values
-            for item in data:
-                target = item['target']
-                new_data[target] = [
-                    (timestamp, value if value is not None else transform_null)
-                    for value, timestamp in item['datapoints']
-                ]
-        return new_data
+    def _post_process_series(self, data):
+        return data
 
     def _construct_graphite_uri(self, targets, start="", stop=""):
         targets_str = "&".join(["target=%s" % target for target in targets])
@@ -129,7 +110,7 @@ class BaseGraphiteSeries(object):
             uri += "&until=%s" % stop
         return uri
 
-    def _graphite_request(self, uri, use_session=True, bucky=False):
+    def _graphite_request(self, uri, use_session=True):
         """Issue a request to graphite."""
 
         global REQ_SESSION
@@ -180,7 +161,7 @@ class BaseGraphiteSeries(object):
                 # If we try to get another metric, say Load, on such a target,
                 # we will get a 200 OK response but the asked target will be
                 # missing from the response body.
-                if self.check_head(bucky=bucky):
+                if self.check_head():
                     reason = ("Trying to do division with empty series, "
                               "the target must be wrong.")
                 else:
@@ -196,10 +177,10 @@ class BaseGraphiteSeries(object):
         resp = self._graphite_request(url)
         return resp.json()
 
-    def check_head(self, bucky=False):
-        return bool(self._find_metrics(self.head(bucky=bucky)))
+    def check_head(self):
+        return bool(self._find_metrics(self.head()))
 
-    def find_metrics(self, strip_head=False, bucky=False):
+    def find_metrics(self, strip_head=False):
         def find_leaves(query):
             leaves = []
             for metric in self._find_metrics(query):
@@ -210,10 +191,10 @@ class BaseGraphiteSeries(object):
                     leaves += find_leaves(metric['id'] + ".*")
             return leaves
 
-        query = "%s.*" % self.head(bucky=bucky)
+        query = "%s.*" % self.head()
         leaves = find_leaves(query)
         if strip_head:
-            prefix = "%s." % self.head(bucky=bucky)
+            prefix = "%s." % self.head()
             leaves = [leaf.replace(prefix, "%(head)s.") for leaf in leaves]
         return leaves
 
@@ -221,15 +202,9 @@ class BaseGraphiteSeries(object):
 class SingleGraphiteSeries(BaseGraphiteSeries):
     """A SingleGraphiteSeries returns a single graphite data series.
 
-    Every subclass needs to define an alias property.
-    It must always return a single series inside a dict, using the alias as
-    key.
-
     """
 
-    @abc.abstractproperty
-    def alias(self):
-        return ""
+    alias = ""
 
     def __init__(self, uuid, alias=""):
         super(SingleGraphiteSeries, self).__init__(uuid)
@@ -240,36 +215,43 @@ class SingleGraphiteSeries(BaseGraphiteSeries):
 class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
     """The simplest case of a SingleGraphiteSeries, using a single target."""
 
-    @abc.abstractproperty
+    def __init__(self, uuid, alias=""):
+        super(SimpleSingleGraphiteSeries, self).__init__(uuid, alias=alias)
+        self._last_name = ""
+
     def sum_function(self):
-        """Must be a string in ['sum', 'avg', 'max', 'min', 'last']."""
+        """Returns the function should be used when summarizing data.
+
+        Must be a string in ['sum', 'avg', 'max', 'min', 'last'].
+
+        """
+        return "avg"
 
     @abc.abstractmethod
     def get_inner_target(self):
         pass
 
-    @abc.abstractmethod
-    def get_inner_target_bucky(self):
-        pass
-
-    def get_targets(self, interval_str="", bucky=False):
-        if bucky:
-            target = self.get_inner_target_bucky()
-        else:
-            target = self.get_inner_target()
+    def get_targets(self, interval_str=""):
+        target = self.get_inner_target()
         if interval_str:
-            target = "summarize(%s,'%s','%s')" % (target, interval_str,
-                                                  self.sum_function)
-        target = "alias(%s,'%s')" % (target, self.alias)
+            target = summarize(target, interval_str, self.sum_function)
+        if self.alias and self.alias != target:
+            target = "alias(%s,'%s')" % (target, self.alias)
+            self._last_name = self.alias
+        else:
+            self._last_name = target
         return [target]
 
-    def _post_process_series(self, data, transform_null=None):
+    def _post_process_series(self, data):
         """Only parse relevant data."""
+        if not self._last_name:
+            log.error("Called _post_process_series but no self._last_name")
+            return []
         for item in data:
-            if item['target'] == self.alias:
+            if item['target'] == self._last_name:
                 return super(SimpleSingleGraphiteSeries,
-                             self)._post_process_series([item], transform_null)
-        return {self.alias: []}
+                             self)._post_process_series([item])
+        return []
 
 
 class CombinedGraphiteSeries(BaseGraphiteSeries):
@@ -284,12 +266,11 @@ class CombinedGraphiteSeries(BaseGraphiteSeries):
                                 "BaseGraphiteSeries." % series)
         self.series_list = series_list
 
-    def get_targets(self, interval_str="", bucky=False):
+    def get_targets(self, interval_str=""):
         targets = []
         # join all child series targets
         for series in self.series_list:
-            targets += series.get_targets(interval_str=interval_str,
-                                          bucky=bucky)
+            targets += series.get_targets(interval_str=interval_str)
         # remove duplicates (using a dict since lookup is a lot faster)
         seen = {}
         uniq_targets = []
@@ -300,10 +281,10 @@ class CombinedGraphiteSeries(BaseGraphiteSeries):
             uniq_targets.append(target)
         return uniq_targets
 
-    def _post_process_series(self, data, transform_null=None):
-        new_data = {}
+    def _post_process_series(self, data):
+        new_data = []
         for series in self.series_list:
-            new_data.update(series._post_process_series(data, transform_null))
+            new_data += series._post_process_series(data)
         return new_data
 
 
@@ -311,208 +292,119 @@ class CpuUtilSeries(SimpleSingleGraphiteSeries):
     """Return CPU utilization as a percentage."""
 
     alias = "cpu-util"
-    sum_function = "avg"
 
     def get_inner_target(self):
-        # Calculate the sum of all time measurements, excluding the "idle" one
-        total_wo_idle_sum = "sumSeries(exclude(%s.cpu-0.*,'idle'))" % self.head()
-        # Calculate the sum of all time measurements
-        total_sum = "sumSeries(%s.cpu-0.*)" % self.head()
-        # Calculate the derivative of each sum
-        first_set = "nonNegativeDerivative(%s)" % total_wo_idle_sum
-        second_set = "nonNegativeDerivative(%s)" % total_sum
-        # Divide the first with the second sum (wo_idle_sum / total_sum)
-        #target = "divideSeries(%s,%s)" % (first_set, second_set)
-        target = "asPercent(%s,%s)" % (first_set, second_set)
-        return target
-
-    def get_inner_target_bucky(self):
-        head = self.head(bucky=True)
-        non_idle = "sumSeries(exclude(%s.cpu.*.*,'idle'))" % head
-        total = "sumSeries(%s.cpu.*.*)" % head
-        perc = "asPercent(%s,%s)" % (non_idle, total)
-        return perc
-
-
-class CpuAllSeries(CombinedGraphiteSeries):
-    """Return all CPU data in a nested dict."""
-
-    def __init__(self, uuid):
-        series_list = [CpuUtilSeries(uuid)]
-        super(CpuAllSeries, self).__init__(uuid, series_list)
-
-    def _post_process_series(self, data, transform_null=None):
-        data = super(CpuAllSeries, self)._post_process_series(data, transform_null)
-        return {
-            'cpu': {
-                'cores': 1,
-                'utilization': data[self.series_list[0].alias],
-            }
-        }
+        return as_percent(
+            sum_series(exclude("%s.cpu.*.*" % self.head(), 'idle')),
+            sum_series("%s.cpu.*.*" % self.head())
+        )
 
 
 class LoadSeries(SimpleSingleGraphiteSeries):
 
     alias = "load"
-    sum_function = "avg"
 
     def get_inner_target(self):
-        return "%s.load.load.shortterm" % (self.head())
-
-    def get_inner_target_bucky(self):
-        return "%s.load.shortterm" % self.head(bucky=True)
+        return "%s.load.shortterm" % self.head()
 
 
 class NetSeries(SimpleSingleGraphiteSeries):
 
     alias = "net"
-    sum_function = "avg"
-    direction = "*"  # '*', 'rx', 'tx'
-    iface = "*"  # '*', 'eth0', 'eth*' etc
 
-    def __init__(self, uuid, alias="", iface="", direction=""):
-        if iface:
-            self.iface = iface
-        if direction:
-            self.direction = direction
+    def __init__(self, uuid, iface, direction, alias=""):
         super(NetSeries, self).__init__(uuid, alias=alias)
+        self.iface = iface
+        self.direction = direction
 
     def get_inner_target(self):
-        # collectd version 4.10 uses 'interface.if_octets-eth0' format
-        # collectd version 5.1  uses 'interface-eth0.if_octets' format
-        # we use the {-eth0,} filter in both places to catch both cases
-        raw_series = "%s.interface{-%s,}.if_octets{-%s,}.%s" % \
-            (self.head(), self.iface, self.iface, self.direction)
-        net_util = "scaleToSeconds(sumSeries(nonNegativeDerivative(%s)),1)" % \
-            (raw_series, )
-        return net_util
-
-    def get_inner_target_bucky(self):
-        return "sumSeries(%s.interface.%s.if_octets.%s)" % (
-            self.head(bucky=True), self.iface, self.direction
+        return "%s.interface.%s.if_octets.%s" % (
+            self.head(), self.iface, self.direction
         )
 
 
-class NetRxSeries(NetSeries):
+class WildcardNetSeries(NetSeries):
+    def get_inner_target(self):
+        return sum_series(super(WildcardNetSeries, self).get_inner_target())
 
-    alias = "net-rx"
-    direction = "rx"
+
+class NetEthRxSeries(WildcardNetSeries):
+    def __init__(self, uuid, alias="net-rx"):
+        super(NetEthRxSeries, self).__init__(uuid, alias=alias,
+                                             iface="eth*", direction="rx")
 
 
-class NetTxSeries(NetSeries):
-
-    alias = "net-tx"
-    direction = "tx"
+class NetEthTxSeries(WildcardNetSeries):
+    def __init__(self, uuid, alias="net-tx"):
+        super(NetEthTxSeries, self).__init__(uuid, alias=alias,
+                                             iface="eth*", direction="tx")
 
 
 class NetAllSeries(CombinedGraphiteSeries):
     """NetAllSeries merges NetRxSeries and NetTxSeries."""
 
     def __init__(self, uuid):
-        series_list = [NetRxSeries(uuid, iface='eth*'),
-                       NetTxSeries(uuid, iface='eth*')]
+        series_list = [NetEthRxSeries(uuid), NetEthTxSeries(uuid)]
         super(NetAllSeries, self).__init__(uuid, series_list)
-
-    def _post_process_series(self, data, transform_null=None):
-        data = super(NetAllSeries, self)._post_process_series(data, transform_null)
-        return {
-            'network': {
-                'eth0': {
-                    'rx': data[self.series_list[0].alias],
-                    'tx': data[self.series_list[1].alias],
-                }
-            }
-        }
 
 
 class MemSeries(SimpleSingleGraphiteSeries):
 
     alias = "memory"
-    sum_function = "avg"
 
     def get_inner_target(self):
-        target_used = 'sumSeries(%s.memory.memory-{buffered,cached,used})' % (self.head())
-        target_total= 'sumSeries(%s.memory.memory-*)' % (self.head())
-        target_perc = 'asPercent(%s, %s)' % (target_used, target_total)
-        return target_perc
+        return as_percent(
+            sum_series("%s.memory.{buffered,cached,used}" % self.head()),
+            sum_series("%s.memory.*" % self.head())
 
-    def get_inner_target_bucky(self):
-        head = self.head(bucky=True)
-        non_free = "sumSeries(%s.memory.{buffered,cached,used})" % head
-        total = "sumSeries(%s.memory.*)" % head
-        perc = "asPercent(%s,%s)" % (non_free, total)
-        return perc
+        )
 
 
 class DiskSeries(SimpleSingleGraphiteSeries):
 
     alias = "disk"
-    sum_function = "avg"
-    direction = "*"
-    disk = "*"
 
-    def __init__(self, uuid, alias="", direction="", disk=""):
-        if direction:
-            self.direction = direction
-        if disk:
-            self.disk = disk
+    def __init__(self, uuid, direction, disk, alias=""):
         super(DiskSeries, self).__init__(uuid, alias=alias)
+        self.direction = direction
+        self.disk = disk
 
     def get_inner_target(self):
-        return "scaleToSeconds(nonNegativeDerivative(sumSeries(%s.disk-*.%s.%s)),1)" % (
-            self.head(), 'disk_octets', self.direction
-        )
-
-    def get_inner_target_bucky(self):
-        return "sumSeries(%s.disk.%s.disk_octets.%s)" % (
-            self.head(bucky=True), self.disk, self.direction
+        return "%s.disk.%s.disc_octets.%s" % (
+            self.head(), self.disk, self.direction
         )
 
 
-class DiskReadSeries(DiskSeries):
+class WildcardDiskSeries(DiskSeries):
+    def get_inner_target(self):
+        return sum_series(super(WildcardDiskSeries, self).get_inner_target())
 
-    alias = "disk-read"
-    direction = "read"
+
+class DiskAllReadSeries(WildcardDiskSeries):
+    def __init__(self, uuid, alias="disk-read"):
+        super(DiskAllReadSeries, self).__init__(uuid, alias=alias,
+                                                disk="*", direction="read")
 
 
-class DiskWriteSeries(DiskSeries):
-
-    alias = "disk-write"
-    direction = "write"
+class DiskAllWriteSeries(WildcardDiskSeries):
+    def __init__(self, uuid, alias="disk-write"):
+        super(DiskAllWriteSeries, self).__init__(uuid, alias=alias,
+                                                 disk="*", direction="write")
 
 
 class DiskAllSeries(CombinedGraphiteSeries):
 
     def __init__(self, uuid):
-        series_list = [DiskReadSeries(uuid), DiskWriteSeries(uuid)]
+        series_list = [DiskAllReadSeries(uuid), DiskAllWriteSeries(uuid)]
         super(DiskAllSeries, self).__init__(uuid, series_list)
-
-    def _post_process_series(self, data, transform_null=None):
-        data = super(DiskAllSeries, self)._post_process_series(data, transform_null)
-        return {
-            'disk': {
-                'disks': 1,
-                'read': {
-                    'xvda1': {
-                        'disk_octets': data[self.series_list[0].alias],
-                    }
-                },
-                'write': {
-                    'xvda1': {
-                        'disk_octets': data[self.series_list[1].alias],
-                    }
-                },
-            }
-        }
 
 
 class AllSeries(CombinedGraphiteSeries):
-    """This combines several series and constructs the nested dict returned
-    by get_stats."""
+    """This combines several series (used by get_stats)"""
 
     def __init__(self, uuid):
         series_list = [
-            CpuAllSeries(uuid),
+            CpuUtilSeries(uuid),
             MemSeries(uuid),
             LoadSeries(uuid),
             NetAllSeries(uuid),
@@ -538,7 +430,7 @@ class NoDataSeries(CombinedGraphiteSeries, SingleGraphiteSeries):
         super(NoDataSeries, self).__init__(uuid, series_list)
 
 
-    def _post_process_series(self, data, transform_null=None):
+    def _post_process_series(self, data):
         """transform_null is ignored here."""
         # All this is weird. Don't do stuff like this in any other class, plz!
         aliases = [series.alias for series in self.series_list]
