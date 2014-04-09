@@ -145,21 +145,6 @@ def get_stats(request):
     return methods.get_stats(uuid, expression, start, stop, interval_str)
 
 
-@view_config(route_name='cross_graphs', request_method='GET')
-def get_cross_graphs(request):
-
-    params = request.params
-    uuid = params.get('uuid')
-    metric = params.get('metric')
-    start = params.get('start')
-    stop = params.get('stop')
-    interval_str = params.get('interval_str')
-    diff = bool(params.get('diff'))
-
-    img = methods.get_cross_graphs(uuid, metric, start, stop, interval_str, diff=diff)
-    return Response(img, content_type='image/png', request=request)
-
-
 @view_config(route_name='find_metrics', request_method='GET', renderer='json')
 def find_metrics(request):
     uuid = request.matchdict['machine']

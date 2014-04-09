@@ -22,7 +22,6 @@ def main(global_config, **settings):
     config.add_route('rule', '/machines/{machine}/rules/{rule}')
     config.add_route('reset', '/reset')
 
-    config.add_route('cross_graphs', '/cross_graphs')
 
     app = config.make_wsgi_app()
     return app

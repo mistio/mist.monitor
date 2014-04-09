@@ -211,58 +211,6 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
                              transform_null=False, bucky=config.GRAPHS_BUCKY)
 
 
-def get_cross_graphs(uuid, metric, start="", stop="", interval_str="", diff=False):
-    """Create graphs to cross-check original collectd's data with bucky's."""
-
-    from mist.monitor.exceptions import GraphiteError
-
-    import requests
-
-    allowed_targets = {
-        'cpu': graphite.CpuUtilSeries,
-        'load': graphite.LoadSeries,
-        'memory': graphite.MemSeries,
-        'disk-read': graphite.DiskReadSeries,
-        'disk-write': graphite.DiskWriteSeries,
-        'net-rx': graphite.NetRxSeries,
-        'net-tx': graphite.NetTxSeries,
-    }
-    if metric not in allowed_targets:
-        raise BadRequestError("Unknown metric '%s'" % metric)
-    series = allowed_targets[metric](uuid)
-    alias = series.alias
-    targets = []
-    if diff:
-        targets.append(series.get_inner_target_bucky())
-        targets.append(series.get_inner_target())
-        targets = ["alias(diffSeries(%s,%s),'bucky-collectd.%s')" % (targets[0], targets[1], alias)]
-    else:
-        series.alias = "collectd.%s" % alias
-        targets += series.get_targets(interval_str=interval_str)
-        series.alias = "bucky.%s" % alias
-        targets += series.get_targets(interval_str=interval_str, bucky=True)
-    targets_str = "&".join(["target=%s" % target for target in targets])
-
-    items = [('target', target) for target in targets]
-    items.append(('width', 586))
-    items.append(('height', 308))
-    if start:
-        items.append(('from', start))
-    if stop:
-        items.append(('until', stop))
-    params_str = "&".join(["%s=%s" % (item[0], item[1]) for item in items])
-    uri = "%s/render?%s" % (config.GRAPHITE_URI, params_str)
-    log.info("cross graphs uri: %s", uri)
-    ## headers = {'Content-type': 'image/png', 'Accept': '*/*'}
-    try:
-        resp = requests.get(uri)
-    except Exception as exc:
-        raise GraphiteError(repr(exc))
-    if not resp.ok:
-        raise Exception("Error response from graphite: %s" % resp.text)
-    return resp.content
-
-
 def find_metrics(uuid):
     series = graphite.LoadSeries(uuid)
     return series.find_metrics(strip_head=True, bucky=config.GRAPHS_BUCKY)
