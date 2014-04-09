@@ -218,6 +218,7 @@ def check_machine(machine, rule_id=''):
         series = conditions_series[condition.cond_id]
         tmp_data = series.post_process_series(data)
         datapoints = tmp_data[0]['datapoints']
+        datapoints = [point for point in datapoints if point[0] is not None]
         if not datapoints:
             log.warning("  * rule '%s' (%s):No data for rule.",
                         condition.rule_id, condition)
