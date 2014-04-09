@@ -254,6 +254,17 @@ class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
         return []
 
 
+class CustomSingleGraphiteSeries(SimpleSingleGraphiteSeries):
+    def __init__(self, uuid, target, alias=""):
+        if not alias:
+            alias = target
+        super(CustomSingleGraphiteSeries, self).__init__(uuid, alias=alias)
+        self._target = target
+
+    def get_inner_target(self):
+        return self._target % {'head': self.head()}
+
+
 class CombinedGraphiteSeries(BaseGraphiteSeries):
     """Combines multiple GraphiteSeries instances together."""
 

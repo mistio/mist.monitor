@@ -194,7 +194,7 @@ def remove_rule(uuid, rule_id):
 
 
 def get_stats(uuid, metrics, start="", stop="", interval_str=""):
-    allowed_targets = {
+    builtin_targets = {
         'cpu': graphite.CpuUtilSeries,
         'load': graphite.LoadSeries,
         'memory': graphite.MemSeries,
@@ -203,9 +203,15 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
     }
     series_list = []
     for metric in metrics:
-        if metric not in allowed_targets:
-            raise BadRequestError("metric '%s' not allowed" % metric)
-        series_list.append(allowed_targets[metric](uuid))
+        if metric in builtin_targets:
+            series_list.append(builtin_targets[metric](uuid))
+        else:
+            if "%(head)s" in metric:
+                series_list.append(
+                    graphite.CustomSingleGraphiteSeries(uuid, target=metric)
+                )
+            else:
+                raise BadRequestError("metric '%s' not allowed" % metric)
     series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
     return series.get_series(start, stop, interval_str=interval_str)
 

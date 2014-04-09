@@ -124,7 +124,6 @@ def get_stats(request):
 
     uuid = request.matchdict['machine']
     params = request.params
-    allowed_targets = ['cpu', 'load', 'memory', 'disk', 'network']
     expression = params.get('expression')
     start = params.get('start')
     stop = params.get('stop')
@@ -134,9 +133,6 @@ def get_stats(request):
         expression = expression.split(',')
     if not expression:
         expression = ['cpu', 'load', 'memory', 'disk', 'network']
-    for target in expression:
-        if target not in allowed_targets:
-            raise BadRequestError("Bad target '%s'" % target)
 
     if re.match("^[0-9]+(\.[0-9]+)?$", interval_str):
         interval_str = int(interval_str)
