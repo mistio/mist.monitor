@@ -11,8 +11,8 @@ from mist.monitor.graphite import NoDataSeries
 from mist.monitor.graphite import CpuUtilSeries
 from mist.monitor.graphite import LoadSeries
 from mist.monitor.graphite import MemSeries
-from mist.monitor.graphite import DiskWriteSeries
-from mist.monitor.graphite import NetTxSeries
+from mist.monitor.graphite import DiskAllWriteSeries
+from mist.monitor.graphite import NetEthTxSeries
 
 from mist.monitor.helpers import tdelta_to_str
 
@@ -33,19 +33,19 @@ METRICS_MAP = {
     'cpu': CpuUtilSeries,
     'load': LoadSeries,
     'ram': MemSeries,
-    'disk-write': DiskWriteSeries,
-    'disk': DiskWriteSeries,  # to gracefully handle old rules (TODO:investigate)
-    'network-tx': NetTxSeries,
+    'disk-write': DiskAllWriteSeries,
+    'disk': DiskAllWriteSeries,  # to gracefully handle old rules (TODO:investigate)
+    'network-tx': NetEthTxSeries,
 }
 
 
-def gt(series, threshold):
-    value = min([value for timestamp, value in series])
+def gt(datapoints, threshold):
+    value = min([value for value, timestamp in datapoints])
     return value > threshold, value
 
 
-def lt(series, threshold):
-    value = max([value for timestamp, value in series])
+def lt(datapoints, threshold):
+    value = max([value for value, timestamp in datapoints])
     return value < threshold, value
 
 
@@ -98,11 +98,11 @@ def notify_core(condition, value):
     return True
 
 
-def check_condition(condition, series):
+def check_condition(condition, datapoints):
 
     # extract value from series and apply operator
     operator = OPERATORS_MAP[condition.operator]
-    triggered, value = operator(series, condition.value)
+    triggered, value = operator(datapoints, condition.value)
 
     # condition state changed
     if triggered != condition.state:
@@ -164,7 +164,7 @@ def check_machine(machine, rule_id=''):
         log.info("  * Machine is not yet activated (inactive for %s).",
                  tdelta_to_str(time()-machine.enabled_time))
         nodata_series = NoDataSeries(machine.uuid)
-        if nodata_series.check_head(bucky=config.ALERTS_BUCKY):
+        if nodata_series.check_head():
             log.info("  * Machine just got activated!")
             with machine.lock_n_load():
                 machine.activated = True
@@ -208,19 +208,21 @@ def check_machine(machine, rule_id=''):
     combined_series = CombinedGraphiteSeries(machine.uuid,
                                              conditions_series.values())
     try:
-        data = combined_series.get_series("-1min")  #(int(time() - 70))
+        data = combined_series.get_series("-70sec", process=False)
     except GraphiteError as exc:
         log.warning("%r", exc)
         return
 
     # check all conditions
     for condition in conditions:
-        condition_series = data[conditions_series[condition.cond_id].alias]
-        if not condition_series:
+        series = conditions_series[condition.cond_id]
+        tmp_data = series.post_process_series(data)
+        datapoints = tmp_data[0]['datapoints']
+        if not datapoints:
             log.warning("  * rule '%s' (%s):No data for rule.",
                         condition.rule_id, condition)
             continue
-        check_condition(condition, condition_series)
+        check_condition(condition, datapoints)
 
 
 def main():
@@ -239,7 +241,6 @@ def main():
             log.warning("%s Will not sleep because ALERT_PERIOD=%d",
                         run_msg, config.ALERT_PERIOD)
         log.info("=" * 79)
-
 
 
 if __name__ == "__main__":

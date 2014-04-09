@@ -57,7 +57,7 @@ class BaseGraphiteSeries(object):
         """
         return []
 
-    def get_series(self, start="", stop="", interval_str=""):
+    def get_series(self, start="", stop="", interval_str="", process=True):
         """Get time series from graphite.
 
         Optional start and stop parameters define time range.
@@ -96,7 +96,9 @@ class BaseGraphiteSeries(object):
             for item in data:
                 item['datapoints'] = [point for point in item['datapoints']
                                       if point[1] >= filter_from]
-        return self.post_process_series(data)
+        if process:
+            data = self.post_process_series(data)
+        return data
 
     def post_process_series(self, data):
         return data
@@ -449,11 +451,11 @@ class NoDataSeries(CombinedGraphiteSeries, SingleGraphiteSeries):
             for item in tmp_data:
                 for value, timestamp in item['datapoints']:
                     if timestamp not in points:
-                        points[timestamp] = True
+                        points[timestamp] = 1
                     if value is not None:
-                        points[timestamp] = False
+                        points[timestamp] = 0
         if not points:
-            points[0] = False
+            points[0] = 1
         return [{
             'target': self.alias,
             'datapoints': [(points[ts], ts) for ts in sorted(points.keys())]
