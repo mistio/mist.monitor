@@ -96,9 +96,9 @@ class BaseGraphiteSeries(object):
             for item in data:
                 item['datapoints'] = [point for point in item['datapoints']
                                       if point[1] >= filter_from]
-        return self._post_process_series(data)
+        return self.post_process_series(data)
 
-    def _post_process_series(self, data):
+    def post_process_series(self, data):
         return data
 
     def _construct_graphite_uri(self, targets, start="", stop=""):
@@ -242,15 +242,15 @@ class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
             self._last_name = target
         return [target]
 
-    def _post_process_series(self, data):
+    def post_process_series(self, data):
         """Only parse relevant data."""
         if not self._last_name:
-            log.error("Called _post_process_series but no self._last_name")
+            log.error("Called post_process_series but no self._last_name")
             return []
         for item in data:
             if item['target'] == self._last_name:
                 return super(SimpleSingleGraphiteSeries,
-                             self)._post_process_series([item])
+                             self).post_process_series([item])
         return []
 
 
@@ -281,10 +281,10 @@ class CombinedGraphiteSeries(BaseGraphiteSeries):
             uniq_targets.append(target)
         return uniq_targets
 
-    def _post_process_series(self, data):
+    def post_process_series(self, data):
         new_data = []
         for series in self.series_list:
-            new_data += series._post_process_series(data)
+            new_data += series.post_process_series(data)
         return new_data
 
 
@@ -370,7 +370,7 @@ class DiskSeries(SimpleSingleGraphiteSeries):
         self.disk = disk
 
     def get_inner_target(self):
-        return "%s.disk.%s.disc_octets.%s" % (
+        return "%s.disk.%s.disk_octets.%s" % (
             self.head(), self.disk, self.direction
         )
 
@@ -430,25 +430,20 @@ class NoDataSeries(CombinedGraphiteSeries, SingleGraphiteSeries):
         super(NoDataSeries, self).__init__(uuid, series_list)
 
 
-    def _post_process_series(self, data):
+    def post_process_series(self, data):
         """transform_null is ignored here."""
-        # All this is weird. Don't do stuff like this in any other class, plz!
-        aliases = [series.alias for series in self.series_list]
-        tmp_data = {}
-        for item in data:
-            if item['target'] in aliases:
+        points = {}
+        for series in self.series_list:
+            tmp_data = series.post_process_series(data)
+            for item in tmp_data:
                 for value, timestamp in item['datapoints']:
-                    if timestamp not in tmp_data:
-                        tmp_data[timestamp] = []
+                    if timestamp not in points:
+                        points[timestamp] = True
                     if value is not None:
-                        tmp_data[timestamp].append(value)
-        new_data = {self.alias: []}
-        for timestamp in sorted(tmp_data.keys()):
-            if tmp_data[timestamp]:
-                new_data[self.alias].append((timestamp, 0))
-            else:
-                new_data[self.alias].append((timestamp, 1))
-        # hack to handle case where graphite knows nothing
-        if not new_data[self.alias]:
-            new_data[self.alias] = [(0, 1)]
-        return new_data
+                        points[timestamp] = False
+        if not points:
+            points[0] = False
+        return [{
+            'target': self.alias,
+            'datapoints': [(points[ts], ts) for ts in sorted(points.keys())]
+        }]
