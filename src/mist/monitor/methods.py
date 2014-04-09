@@ -195,7 +195,7 @@ def remove_rule(uuid, rule_id):
 
 def get_stats(uuid, metrics, start="", stop="", interval_str=""):
     allowed_targets = {
-        'cpu': graphite.CpuAllSeries,
+        'cpu': graphite.CpuUtilSeries,
         'load': graphite.LoadSeries,
         'memory': graphite.MemSeries,
         'disk': graphite.DiskAllSeries,
@@ -207,13 +207,12 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
             raise BadRequestError("metric '%s' not allowed" % metric)
         series_list.append(allowed_targets[metric](uuid))
     series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
-    return series.get_series(start, stop, interval_str=interval_str,
-                             transform_null=False, bucky=config.GRAPHS_BUCKY)
+    return series.get_series(start, stop, interval_str=interval_str)
 
 
 def find_metrics(uuid):
     series = graphite.LoadSeries(uuid)
-    return series.find_metrics(strip_head=True, bucky=config.GRAPHS_BUCKY)
+    return series.find_metrics(strip_head=True)
 
 
 def reset_hard(data):
