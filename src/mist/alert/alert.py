@@ -7,6 +7,7 @@ from mist.monitor.model import get_all_machines
 
 from mist.monitor.graphite import SingleGraphiteSeries
 from mist.monitor.graphite import CombinedGraphiteSeries
+from mist.monitor.graphite import CustomSingleGraphiteSeries
 from mist.monitor.graphite import NoDataSeries
 from mist.monitor.graphite import CpuUtilSeries
 from mist.monitor.graphite import LoadSeries
@@ -28,7 +29,7 @@ ch = logging.StreamHandler()
 log.addHandler(ch)
 
 
-METRICS_MAP = {
+BUILTIN_METRICS = {
     'nodata': NoDataSeries,
     'cpu': CpuUtilSeries,
     'load': LoadSeries,
@@ -185,10 +186,11 @@ def check_machine(machine, rule_id=''):
             log.warning("  * rule '%s':Condition not found, probably rule just"
                         " got updated. Will check on next run.", rule_id)
             continue
-        if condition.metric not in METRICS_MAP:
-            log.error("  * rule '%s' (%s):Unknown metric '%s'.",
-                      rule_id, condition, condition.metric)
-            continue
+        if condition.metric not in BUILTIN_METRICS:
+            if "%(head)s" not in condition.metric:
+                log.error("  * rule '%s' (%s):Unknown metric '%s'.",
+                          rule_id, condition, condition.metric)
+                continue
         if condition.operator not in OPERATORS_MAP:
             log.error("  * rule '%s' (%s):Unknown operator '%s'.",
                       rule_id, condition, condition.operator)
@@ -201,10 +203,14 @@ def check_machine(machine, rule_id=''):
         return
 
     # combine all conditions to perform only one graphite query per machine
-    conditions_series = {
-        condition.cond_id: METRICS_MAP[condition.metric](machine.uuid)
-        for condition in conditions
-    }
+    conditions_series = {}
+    for condition in conditions:
+        if condition.metric in BUILTIN_METRICS:
+            series = BUILTIN_METRICS[condition.metric](machine.uuid)
+        else:
+            series = CustomSingleGraphiteSeries(machine.uuid,
+                                                target=condition.metric)
+        conditions_series[condition.cond_id] = series
     combined_series = CombinedGraphiteSeries(machine.uuid,
                                              conditions_series.values())
     try:
