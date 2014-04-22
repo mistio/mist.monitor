@@ -78,3 +78,8 @@ RETENTIONS = settings.get(
 # string and sent along with a reset http request from core. Under normal
 # circumstances it should be left blank for security reasons.
 RESET_KEY = settings.get("RESET_KEY", "")
+
+
+# Switch graphs/alerts to bucky
+GRAPHS_BUCKY = settings.get("GRAPHS_BUCKY", False)
+ALERTS_BUCKY = settings.get("ALERTS_BUCKY", False)

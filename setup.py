@@ -21,6 +21,7 @@ requires = [
     'pymongo',
     'python-memcached',
     'pyyaml',
+    'bucky',
 ]
 
 setup(

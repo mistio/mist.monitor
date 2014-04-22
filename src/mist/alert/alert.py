@@ -164,7 +164,7 @@ def check_machine(machine, rule_id=''):
         log.info("  * Machine is not yet activated (inactive for %s).",
                  tdelta_to_str(time()-machine.enabled_time))
         nodata_series = NoDataSeries(machine.uuid)
-        if nodata_series.check_head():
+        if nodata_series.check_head(bucky=config.ALERTS_BUCKY):
             log.info("  * Machine just got activated!")
             with machine.lock_n_load():
                 machine.activated = True
@@ -210,7 +210,7 @@ def check_machine(machine, rule_id=''):
 
     for since in ("-70sec", "-100sec"):
         try:
-            data = combined_series.get_series(since)  #(int(time() - 70))
+            data = combined_series.get_series(since, bucky=config.ALERTS_BUCKY)
         except GraphiteError as exc:
             log.warning("%r", exc)
             return
