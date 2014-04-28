@@ -259,6 +259,8 @@ class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
 
 class CustomSingleGraphiteSeries(SimpleSingleGraphiteSeries):
     def __init__(self, uuid, target, alias=""):
+        if not alias:
+            alias = target
         super(CustomSingleGraphiteSeries, self).__init__(uuid, alias=alias)
         self._target = target
 

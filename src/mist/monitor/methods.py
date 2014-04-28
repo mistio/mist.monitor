@@ -204,7 +204,7 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
         'network-tx': graphite.NetEthTxSeries,
     }
     series_list = []
-    for metric in metrics:
+    for metric in metrics or builtin_targets.keys():
         if metric in builtin_targets:
             series_list.append(builtin_targets[metric](uuid))
         else:
@@ -214,8 +214,6 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
                 )
             else:
                 raise BadRequestError("metric '%s' not allowed" % metric)
-    if not series_list:
-        series_list = [target(uuid) for target in builtin_targets]
     series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
     return series.get_series(start, stop, interval_str=interval_str)
 
