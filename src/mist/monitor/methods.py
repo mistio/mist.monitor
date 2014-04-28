@@ -197,9 +197,11 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
     builtin_targets = {
         'cpu': graphite.CpuUtilSeries,
         'load': graphite.LoadSeries,
-        'memory': graphite.MemSeries,
-        'disk': graphite.DiskAllSeries,
-        'network': graphite.NetAllSeries,
+        'ram': graphite.MemSeries,
+        'disk-read': graphite.DiskAllReadSeries,
+        'disk-write': graphite.DiskAllWriteSeries,
+        'network-rx': graphite.NetEthRxSeries,
+        'network-tx': graphite.NetEthTxSeries,
     }
     series_list = []
     for metric in metrics:
@@ -212,6 +214,8 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
                 )
             else:
                 raise BadRequestError("metric '%s' not allowed" % metric)
+    if not series_list:
+        series_list = [target(uuid) for target in builtin_targets]
     series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
     return series.get_series(start, stop, interval_str=interval_str)
 

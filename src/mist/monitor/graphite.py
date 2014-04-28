@@ -71,6 +71,7 @@ class BaseGraphiteSeries(object):
             start = int(start)
             filter_from = start
             ago = time() - start
+            step = 0
             for period in sorted(config.RETENTIONS.keys()):
                 if ago <= period:
                     step = config.RETENTIONS[period]
@@ -302,7 +303,7 @@ class CombinedGraphiteSeries(BaseGraphiteSeries):
 class CpuUtilSeries(SimpleSingleGraphiteSeries):
     """Return CPU utilization as a percentage."""
 
-    alias = "cpu-util"
+    alias = "cpu"
 
     def get_inner_target(self):
         return as_percent(
@@ -340,13 +341,13 @@ class WildcardNetSeries(NetSeries):
 
 
 class NetEthRxSeries(WildcardNetSeries):
-    def __init__(self, uuid, alias="net-rx"):
+    def __init__(self, uuid, alias="network-rx"):
         super(NetEthRxSeries, self).__init__(uuid, alias=alias,
                                              iface="eth*", direction="rx")
 
 
 class NetEthTxSeries(WildcardNetSeries):
-    def __init__(self, uuid, alias="net-tx"):
+    def __init__(self, uuid, alias="network-tx"):
         super(NetEthTxSeries, self).__init__(uuid, alias=alias,
                                              iface="eth*", direction="tx")
 
@@ -361,7 +362,7 @@ class NetAllSeries(CombinedGraphiteSeries):
 
 class MemSeries(SimpleSingleGraphiteSeries):
 
-    alias = "memory"
+    alias = "ram"
 
     def get_inner_target(self):
         return as_percent(

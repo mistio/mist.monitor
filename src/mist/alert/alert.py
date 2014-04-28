@@ -13,6 +13,8 @@ from mist.monitor.graphite import CpuUtilSeries
 from mist.monitor.graphite import LoadSeries
 from mist.monitor.graphite import MemSeries
 from mist.monitor.graphite import DiskAllWriteSeries
+from mist.monitor.graphite import DiskAllReadSeries
+from mist.monitor.graphite import NetEthRxSeries
 from mist.monitor.graphite import NetEthTxSeries
 
 from mist.monitor.helpers import tdelta_to_str
@@ -34,8 +36,9 @@ BUILTIN_METRICS = {
     'cpu': CpuUtilSeries,
     'load': LoadSeries,
     'ram': MemSeries,
+    'disk-read': DiskAllReadSeries,
     'disk-write': DiskAllWriteSeries,
-    'disk': DiskAllWriteSeries,  # to gracefully handle old rules (TODO:investigate)
+    'network-rx': NetEthRxSeries,
     'network-tx': NetEthTxSeries,
 }
 

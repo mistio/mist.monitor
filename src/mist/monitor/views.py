@@ -131,8 +131,6 @@ def get_stats(request):
 
     if expression and isinstance(expression, basestring):
         expression = expression.split(',')
-    if not expression:
-        expression = ['cpu', 'load', 'memory', 'disk', 'network']
 
     if re.match("^[0-9]+(\.[0-9]+)?$", interval_str):
         interval_str = int(interval_str)
