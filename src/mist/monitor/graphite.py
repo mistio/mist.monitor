@@ -237,7 +237,7 @@ class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
     def get_targets(self, interval_str=""):
         target = self.get_inner_target()
         if interval_str:
-            target = summarize(target, interval_str, self.sum_function)
+            target = summarize(target, interval_str, self.sum_function())
         if self.alias and self.alias != target:
             target = "alias(%s,'%s')" % (target, self.alias)
             self._last_name = self.alias
