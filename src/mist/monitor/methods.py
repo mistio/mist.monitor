@@ -154,9 +154,12 @@ def add_rule(uuid, rule_id, metric, operator, value, reminder_list=None,
     # being triggered in seconds). If not provided, default will be used.
     if reminder_list:
         condition.reminder_list = reminder_list
-    # we set not level to 1 so that new rules that are not satisfied
+    # we set notification level to 1 so that new rules that are not satisfied
     # don't send an OK to core immediately after creation
     condition.notification_level = 1
+
+    # TODO: verify target is valid
+
     condition.create()
 
     with machine.lock_n_load():
@@ -194,33 +197,32 @@ def remove_rule(uuid, rule_id):
 
 
 def get_stats(uuid, metrics, start="", stop="", interval_str=""):
-    builtin_targets = {
-        'cpu': graphite.CpuUtilSeries,
-        'load': graphite.LoadSeries,
-        'ram': graphite.MemSeries,
-        'disk-read': graphite.DiskAllReadSeries,
-        'disk-write': graphite.DiskAllWriteSeries,
-        'network-rx': graphite.NetEthRxSeries,
-        'network-tx': graphite.NetEthTxSeries,
+
+    old_targets = {
+        'cpu': 'cpu.total.nonidle',
+        'load': 'load.shorterm',
+        'ram': 'memory.nonfree_percent',
+        'disk-read': 'disk.total.disk_octets.read',
+        'disk-write': 'disk.total.disk_octets.write',
+        'network-rx': 'interface.total.if_octets.rx',
+        'network-tx': 'interface.total.if_octets.tx',
     }
-    series_list = []
-    for metric in metrics or builtin_targets.keys():
-        if metric in builtin_targets:
-            series_list.append(builtin_targets[metric](uuid))
-        else:
-            if "%(head)s" in metric:
-                series_list.append(
-                    graphite.CustomSingleGraphiteSeries(uuid, target=metric)
-                )
-            else:
-                raise BadRequestError("metric '%s' not allowed" % metric)
-    series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
-    return series.get_series(start, stop, interval_str=interval_str)
+    targets = [old_targets.get(metric, metric) for metric in metrics]
+    handler = graphite.MultiHandler(uuid)
+    data = handler.get_data(targets, start, stop, interval_str=interval_str)
+    for item in data:
+        if item['alias'].rfind("%(head)s.") == 0:
+            item['alias'] = item['alias'][9:]
+    return data
 
 
 def find_metrics(uuid):
-    series = graphite.LoadSeries(uuid)
-    return series.find_metrics(strip_head=True)
+    handler = graphite.MultiHandler(uuid)
+    metrics = handler.find_metrics()
+    for item in metrics:
+        if item['alias'].rfind("%(head)s.") == 0:
+            item['alias'] = item['alias'][9:]
+    return metrics
 
 
 def reset_hard(data):

@@ -1,9 +1,7 @@
-import abc
 import re
 import logging
-import HTMLParser
 import requests
-from time import time
+import HTMLParser
 
 
 from mist.monitor import config
@@ -15,7 +13,7 @@ REQ_SESSION = None
 log = logging.getLogger(__name__)
 
 
-def summarize(series, interval, function):
+def summarize(series, interval, function="avg"):
     return "summarize(%s,'%s','%s')" % (series, interval, function)
 
 
@@ -34,104 +32,70 @@ def exclude(series_list, regex):
     return "exclude(%s,'%s')" % (series_list, regex)
 
 
-class BaseGraphiteSeries(object):
-    """Base graphite target class that defines an interface and provides
-    convenience methods for subclasses to use."""
+def alias(series_list, name):
+    return "alias(%s,'%s')" % (series_list, name)
 
-    __metaclass__ = abc.ABCMeta
 
+class GenericHandler(object):
     def __init__(self, uuid):
-        """A uuid is required to initialize the class."""
         self.uuid = uuid
 
     def head(self):
-        """Top level data target."""
         return "bucky.%s" % self.uuid
 
-    @abc.abstractmethod
-    def get_targets(self, interval_str=''):
-        """Return list of target strings.
-
-        If interval_str specified, summarize targets accordingly.
-
-        """
-        return []
-
-    def get_series(self, start="", stop="", interval_str="", process=True):
-        """Get time series from graphite.
-
-        Optional start and stop parameters define time range.
-
-        """
-
-        # if start is a timestamp
-        if re.match("^[0-9]+(\.[0-9]+)?$", start):
-            # Ask for some more cause derivatives will always return None
-            # as their first value. Check RETENTIONS from config to find step.
-            start = int(start)
-            filter_from = start
-            ago = time() - start
-            step = 0
-            for period in sorted(config.RETENTIONS.keys()):
-                if ago <= period:
-                    step = config.RETENTIONS[period]
-                    start -= 2 * step
-                    break
-            start = str(start)
-            # remove interval_str if <= step so that we won't get nulls in
-            # between measurements (if <) or last measurement null (if =)
-            # only works if interval_str is in seconds
-            interval_str_match = re.match("^([0-9]+)(?:sec)?s?$", interval_str)
-            if interval_str_match:
-                interval_secs = int(interval_str_match.groups()[0])
-                if interval_secs <= step:
-                    interval_str = ""
-        else:
-            filter_from = 0
-
-        targets = self.get_targets(interval_str=interval_str)
-        uri = self._construct_graphite_uri(targets, start, stop)
-        resp = self._graphite_request(uri)
+    def get_data(self, targets, start="", stop="", interval_str=""):
+        if isinstance(targets, basestring):
+            targets = [targets]
+        clean_targets = []
+        for target in targets:
+            target, _alias = self.target_alias(target)
+            if target:
+                # target = target % {'head': self.head()}
+                _target = target
+                if interval_str:
+                    target = summarize(target, interval_str)
+                if _alias != _target or interval_str:
+                    # if alias different than target, or summarize() added to
+                    # target, use alias to not screw with the return target
+                    target = alias(target, _alias)
+                clean_targets.append(target % {'head': self.head()})
+        url = self.get_graphite_render_url(clean_targets,
+                                           start=start, stop=stop)
+        resp = self.graphite_request(url)
         data = resp.json()
-        if filter_from:
-            for item in data:
-                item['datapoints'] = [point for point in item['datapoints']
-                                      if point[1] >= filter_from]
-        if process:
-            data = self.post_process_series(data)
+        for item in data:
+            item.update(self.decorate_target(item['target']))
         return data
 
-    def post_process_series(self, data):
-        return data
+    def get_graphite_render_url(self, targets, start="", stop="",
+                                resp_format="json"):
+        params = [('target', target) for target in targets]
+        params += [('from', start or None),
+                   ('until', stop or None),
+                   ('format', resp_format or None)]
+        return requests.Request('GET', "%s/render" % config.GRAPHITE_URI,
+                                params=params).prepare().url
 
-    def _construct_graphite_uri(self, targets, start="", stop=""):
-        targets_str = "&".join(["target=%s" % target for target in targets])
-        uri = "%s/render?%s&format=json" % (config.GRAPHITE_URI, targets_str)
-        if start:
-            uri += "&from=%s" % start
-        if stop:
-            uri += "&until=%s" % stop
-        return uri
-
-    def _graphite_request(self, uri, use_session=True):
+    def graphite_request(self, url, use_session=True):
         """Issue a request to graphite."""
 
         global REQ_SESSION
 
         if use_session:
             log.debug("Using turbo http session")
-            REQ_SESSION = requests.Session()
-            adapter = requests.adapters.HTTPAdapter(pool_connections=100,
-                                                    pool_maxsize=100)
-            REQ_SESSION.mount('http://', adapter)
-            REQ_SESSION.keep_alive = True
+            if REQ_SESSION is None:
+                REQ_SESSION = requests.Session()
+                adapter = requests.adapters.HTTPAdapter(pool_connections=100,
+                                                        pool_maxsize=100)
+                REQ_SESSION.mount('http://', adapter)
+                REQ_SESSION.keep_alive = True
             req = REQ_SESSION
         else:
             req = requests
 
         try:
-            log.info("Querying graphite uri: '%s'.", uri)
-            resp = req.get(uri)
+            log.info("Querying graphite uri: '%s'.", url)
+            resp = req.get(url)
         except Exception as exc:
             log.error("Error sending request to graphite: %r", exc)
             raise GraphiteError(repr(exc))
@@ -175,15 +139,33 @@ class BaseGraphiteSeries(object):
             raise GraphiteError(reason)
         return resp
 
+    def target_alias(self, name):
+        """Given a metric identifier, return the correct target and alias"""
+        target = name.replace("%s." % self.head(), "%(head)s.")
+        if "%(head)s." not in target:
+            target = "%(head)s." + target
+        return target, target
+
+    def decorate_target(self, target):
+        """Returns a dict with metadata about the target"""
+        target, alias = self.target_alias(target)
+        name = target.replace("%(head)s.", "").replace(".", " ").capitalize()
+        return {
+            'target': target,
+            'alias': alias,
+            'name': name,
+            'unit': "",
+            'max_value': None,
+            'min_value': None,
+            'priority': 100,
+        }
+
     def _find_metrics(self, query):
         url = "%s/metrics?query=%s" % (config.GRAPHITE_URI, query)
-        resp = self._graphite_request(url)
+        resp = self.graphite_request(url)
         return resp.json()
 
-    def check_head(self):
-        return bool(self._find_metrics(self.head()))
-
-    def find_metrics(self, strip_head=False):
+    def find_metrics(self, plugin=""):
         def find_leaves(query):
             leaves = []
             for metric in self._find_metrics(query):
@@ -194,270 +176,464 @@ class BaseGraphiteSeries(object):
                     leaves += find_leaves(metric['id'] + ".*")
             return leaves
 
-        query = "%s.*" % self.head()
-        leaves = find_leaves(query)
-        if strip_head:
-            prefix = "%s." % self.head()
-            leaves = [leaf.replace(prefix, "%(head)s.") for leaf in leaves]
-        return leaves
+        query = self.head()
+        if plugin:
+            query += ".%s" % plugin
+        metrics = [self.decorate_target(leaf) for leaf in find_leaves(query)]
+        return metrics
+
+    def check_head(self):
+        return bool(self._find_metrics(self.head()))
 
 
-class SingleGraphiteSeries(BaseGraphiteSeries):
-    """A SingleGraphiteSeries returns a single graphite data series.
+class CustomHandler(GenericHandler):
+    plugin = ""
 
-    """
+    def __init__(self, uuid):
+        super(CustomHandler, self).__init__(uuid)
 
-    alias = ""
+    def find_metrics(self, plugin=""):
+        if not plugin:
+            plugin = self.plugin
+        return super(CustomHandler, self).find_metrics(plugin=plugin)
 
-    def __init__(self, uuid, alias=""):
-        super(SingleGraphiteSeries, self).__init__(uuid)
-        if alias:
-            self.alias = alias
+    def parse_target(self, target):
+        """Return list of target parts"""
+        parts = target.split(".")
+        if parts[0] == "%(head)s" and parts[1] == self.plugin:
+            return parts[2:]
+        log.error("%s() got invalid target: '%s'.",
+                  self.__class__.__name__, target)
 
 
-class SimpleSingleGraphiteSeries(SingleGraphiteSeries):
-    """The simplest case of a SingleGraphiteSeries, using a single target."""
+class LoadHandler(CustomHandler):
+    plugin = "load"
 
-    def __init__(self, uuid, alias=""):
-        super(SimpleSingleGraphiteSeries, self).__init__(uuid, alias=alias)
-        self._last_name = ""
+    def parse_target(self, target):
+        """Returl list of single element 'load period'."""
+        parts = super(LoadHandler, self).parse_target(target)
+        if parts is not None:
+            if len(parts) == 1:
+                period = parts[0]
+                # period is in ('shortterm', 'midterm', 'longterm')
+                return [period]
+        log.error("%s() got invalid target: '%s'.",
+                  self.__class__.__name__, target)
 
-    def sum_function(self):
-        """Returns the function should be used when summarizing data.
+    def decorate_target(self, target):
+        metric = super(LoadHandler, self).decorate_target(target)
+        parts = self.parse_target(metric['alias'])
+        if parts is not None:
+            period = parts[0]
+            minutes = {'shortterm': 1, 'midterm': 5, 'longterm': 15}
+            if minutes[period] > 1:
+                metric['name'] = "Load (%d mins)" % minutes[period]
+            else:
+                metric['name'] = "Load"
+            metric['min_value'] = 0
+            metric['priority'] = 0
+        return metric
 
-        Must be a string in ['sum', 'avg', 'max', 'min', 'last'].
 
-        """
-        return "avg"
+class DiskHandler(CustomHandler):
+    plugin = "disk"
 
-    @abc.abstractmethod
-    def get_inner_target(self):
-        pass
+    def parse_target(self, target):
+        parts = super(DiskHandler, self).parse_target(target)
+        if parts is not None:
+            if len(parts) == 3:
+                disk, kind, direction = parts
+                return disk, kind, direction
+        log.error("%s() got invalid target: '%s'.",
+                  self.__class__.__name__, target)
 
-    def get_targets(self, interval_str=""):
-        target = self.get_inner_target()
-        if interval_str:
-            target = summarize(target, interval_str, self.sum_function())
-        if self.alias and self.alias != target:
-            target = "alias(%s,'%s')" % (target, self.alias)
-            self._last_name = self.alias
+    def decorate_target(self, target):
+        metric = super(DiskHandler, self).decorate_target(target)
+        parts = self.parse_target(metric['alias'])
+        if parts is not None:
+            disk, kind, direction = parts
+            if kind.startswith("disk_"):
+                kind = kind[5:]
+            if kind == "octets":
+                if disk == "total":
+                    metric['name'] = "Disks %s" % direction.capitalize()
+                else:
+                    metric['name'] = "Disk %s %s" % (disk,
+                                                     direction.capitalize())
+                metric['unit'] = "B/s"
+                metric['min_value'] = 0
+                metric['max_value'] = 750000000  # 6Gbps (SATA3)
+                metric['priority'] = 0
+            else:
+                if disk == "total":
+                    metric['name'] = "Disks %s %s" % (direction.capitalize(),
+                                                      kind.capitalize())
+                else:
+                    metric['name'] = "Disk %s %s %s" % (
+                        disk, direction.capitalize(), kind.capitalize()
+                    )
+                metric['priority'] = 50
+        return metric
+
+    def find_metrics(self, plugin=""):
+        metrics = super(DiskHandler, self).find_metrics()
+        kinds = set()
+        directions = set()
+        for metric in metrics:
+            parts = self.parse_target(metric['alias'])
+            if parts is not None:
+                disk, kind, direction = parts
+                kinds.add(kind)
+                directions.add(direction)
+        for kind in kinds:
+            for direction in directions:
+                target = "%(head)s." + "disk.total.%s.%s" % (kind, direction)
+                metrics.append(self.decorate_target(target))
+        return metrics
+
+    def target_alias(self, name):
+        target, alias = super(DiskHandler, self).target_alias(name)
+        parts = self.parse_target(target)
+        if parts is not None:
+            disk, kind, direction = parts
+            if disk == "total":
+                target = sum_series(
+                    "%(head)s." + "disk.*.%s.%s" % (kind, direction)
+                )
+        return target, alias
+
+
+class InterfaceHandler(CustomHandler):
+    plugin = "interface"
+
+    def parse_target(self, target):
+        parts = super(InterfaceHandler, self).parse_target(target)
+        if parts is not None:
+            if len(parts) == 3:
+                iface, kind, direction = parts
+                return iface, kind, direction
+        log.error("%s() got invalid target: '%s'.",
+                  self.__class__.__name__, target)
+
+    def decorate_target(self, target):
+        metric = super(InterfaceHandler, self).decorate_target(target)
+        parts = self.parse_target(metric['alias'])
+        if parts is not None:
+            iface, kind, direction = parts
+            if kind.startswith("if_"):
+                kind = kind[3:]
+            if kind == "octets":
+                if iface == "total":
+                    metric['name'] = "Ifaces %s" % direction.capitalize()
+                else:
+                    metric['name'] = "Iface %s %s" % (iface,
+                                                      direction.capitalize())
+                metric['unit'] = "B/s"
+                metric['min_value'] = 0
+                metric['max_value'] = 1250000000  # 10Gbps (10 gigabit eth)
+                metric['priority'] = 0
+            else:
+                if iface == "total":
+                    metric['name'] = "Ifaces %s %s" % (direction.capitalize(),
+                                                       kind.capitalize())
+                else:
+                    metric['name'] = "Iface %s %s %s" % (
+                        iface, direction.capitalize(), kind.capitalize()
+                    )
+                metric['priority'] = 50
+            if iface.startswith("lo"):
+                metric['priority'] += 10
+        return metric
+
+    def find_metrics(self, plugin=""):
+        metrics = super(InterfaceHandler, self).find_metrics()
+        kinds = set()
+        directions = set()
+        for metric in metrics:
+            parts = self.parse_target(metric['alias'])
+            if parts is not None:
+                iface, kind, direction = parts
+                kinds.add(kind)
+                directions.add(direction)
+        for kind in kinds:
+            for direction in directions:
+                target = "interface.total.%s.%s" % (kind, direction)
+                metrics.append(self.decorate_target("%(head)s." + target))
+        return metrics
+
+    def target_alias(self, name):
+        target, alias = super(InterfaceHandler, self).target_alias(name)
+        parts = self.parse_target(target)
+        if parts is not None:
+            iface, kind, direction = parts
+            if iface == "total":
+                target = sum_series(
+                    "%(head)s." + "interface.*.%s.%s" % (kind, direction)
+                )
+        return target, alias
+
+
+class CpuHandler(CustomHandler):
+    plugin = "cpu"
+
+    def parse_target(self, target):
+        parts = super(CpuHandler, self).parse_target(target)
+        if parts is not None:
+            if len(parts) == 2:
+                core, kind = parts
+                return core, kind
+        log.error("%s() got invalid target: '%s'.",
+                  self.__class__.__name__, target)
+
+    def decorate_target(self, target):
+        metric = super(CpuHandler, self).decorate_target(target)
+        parts = self.parse_target(metric['alias'])
+        if parts is not None:
+            core, kind = parts
+            if core == "total":
+                metric['name'] = "CPU %s" % kind
+                metric['unit'] = "%"
+                metric['min_value'] = 0
+                metric['max_value'] = 100
+                metric['priority'] = 0
+                if kind == "nonidle":
+                    metric['name'] = "CPU"
+                    metric['priority'] -= 1
+            else:
+                metric['name'] = "CPU %s %s" % (core, kind)
+                metric['unit'] = "jiffies"
+                metric['min_value'] = 0
+                metric['max_value'] = None
+                metric['priority'] = 50
+        return metric
+
+    def find_metrics(self, plugin=""):
+        metrics = super(CpuHandler, self).find_metrics()
+        kinds = set()
+        for metric in metrics:
+            parts = self.parse_target(metric['alias'])
+            if parts is not None:
+                core, kind = parts
+                kinds.add(kind)
+        kinds.add("nonidle")
+        for kind in kinds:
+            target = "%(head)s.cpu.total." + kind
+            metrics.append(self.decorate_target(target))
+        return metrics
+
+    def target_alias(self, name):
+        target, alias = super(CpuHandler, self).target_alias(name)
+        parts = self.parse_target(target)
+        if parts is not None:
+            core, kind = parts
+            if core == "total":
+                if kind != "nonidle":
+                    base_target = "%(head)s.cpu.*." + kind
+                else:
+                    base_target = exclude("%(head)s.cpu.*.*", "idle")
+                target = as_percent(
+                    sum_series(base_target),
+                    sum_series("%(head)s.cpu.*.*")
+                )
+        return target, alias
+
+
+class MemoryHandler(CustomHandler):
+    plugin = "memory"
+
+    def parse_target(self, target):
+        parts = super(MemoryHandler, self).parse_target(target)
+        if parts is not None:
+            if len(parts) == 1:
+                kind = parts[0]
+                percent = False
+                if kind.endswith("_percent"):
+                    kind = kind[:-8]
+                    percent = True
+                return kind, percent
+        log.error("%s() got invalid target: '%s'.",
+                  self.__class__.__name__, target)
+
+    def decorate_target(self, target):
+        metric = super(MemoryHandler, self).decorate_target(target)
+        parts = self.parse_target(metric['alias'])
+        if parts is not None:
+            kind, percent = parts
+            if kind == "nonfree":
+                metric['name'] = "RAM"
+            else:
+                metric['name'] = "RAM %s" % kind
+            if percent:
+                metric['unit'] = "%"
+                metric['min_value'] = 0
+                metric['max_value'] = 100
+                metric['priority'] = 0
+            else:
+                metric['unit'] = "B"
+                metric['min_value'] = 0
+                metric['max_value'] = 34359738368  # 32 GiB
+                metric['priority'] = 30
+        return metric
+
+    def find_metrics(self, plugin=""):
+        metrics = super(MemoryHandler, self).find_metrics()
+        metrics.append(self.decorate_target("%(head)s.memory.nonfree"))
+        kinds = set()
+        for metric in metrics:
+            parts = self.parse_target(metric['alias'])
+            if parts is not None:
+                kind = parts[0]
+                kinds.add(kind)
+        for kind in kinds:
+            target = "%(head)s." + "memory.%s_percent" % kind
+            metrics.append(self.decorate_target(target))
+        return metrics
+
+    def target_alias(self, name):
+        target, alias = super(MemoryHandler, self).target_alias(name)
+        parts = self.parse_target(target)
+        if parts is not None:
+            kind, percent = parts
+            if percent:
+                if kind != "nonfree":
+                    base_target = "%(head)s.memory." + kind
+                else:
+                    base_target = sum_series(
+                        exclude("%(head)s.memory.*", 'free')
+                    )
+                target = as_percent(
+                    base_target, sum_series("%(head)s.memory.*")
+                )
+            elif kind == 'nonfree':
+                target = sum_series(exclude("%(head)s.memory.*", 'free'))
+        return target, alias
+
+
+class MultiHandler(GenericHandler):
+    def __init__(self, uuid):
+        super(MultiHandler, self).__init__(uuid)
+        self.handlers = {
+            'generic': GenericHandler(uuid),
+            'interface': InterfaceHandler(uuid),
+            'disk': DiskHandler(uuid),
+            'load': LoadHandler(uuid),
+            'cpu': CpuHandler(uuid),
+            'memory': MemoryHandler(uuid),
+        }
+        self.vtargets = []
+
+    def get_handler(self, target=""):
+        plugin = "generic"
+        if target in self.handlers:
+            plugin = target
         else:
-            self._last_name = target
-        return [target]
+            parts = self.target_alias(target)[0].split(".")
+            if len(parts) > 1 and parts[0] == "%(head)s":
+                if parts[1] in self.handlers:
+                    plugin = parts[1]
+        log.debug("get_handler plugin: %s", plugin)
+        return self.handlers[plugin]
 
-    def post_process_series(self, data):
-        """Only parse relevant data."""
-        if not self._last_name:
-            log.error("Called post_process_series but no self._last_name")
-            return []
-        for item in data:
-            if item['target'] == self._last_name:
-                return super(SimpleSingleGraphiteSeries,
-                             self).post_process_series([item])
-        return []
+    def find_metrics(self, plugin=""):
+        if plugin:
+            plugins = [plugin]
+        else:
+            query = "%s.*" % self.head()
+            top_level_metrics = self._find_metrics(query)
+            plugins = [metric['id'].split(".")[-1]
+                       for metric in top_level_metrics]
+        metrics = []
+        for plugin in plugins:
+            handler = self.get_handler(plugin)
+            metrics += handler.find_metrics(plugin=plugin)
+        return metrics
 
-
-class CustomSingleGraphiteSeries(SimpleSingleGraphiteSeries):
-    def __init__(self, uuid, target, alias=""):
-        if not alias:
-            alias = target
-        super(CustomSingleGraphiteSeries, self).__init__(uuid, alias=alias)
-        self._target = target
-
-    def get_inner_target(self):
-        return self._target % {'head': self.head()}
-
-
-class CombinedGraphiteSeries(BaseGraphiteSeries):
-    """Combines multiple GraphiteSeries instances together."""
-
-    def __init__(self, uuid, series_list=None):
-        """series should be a list of GraphiteSeries instances."""
-        super(CombinedGraphiteSeries, self).__init__(uuid)
-        for series in series_list:
-            if not isinstance(series, BaseGraphiteSeries):
-                raise TypeError("%r is not instance of "
-                                "BaseGraphiteSeries." % series)
-        self.series_list = series_list
-
-    def get_targets(self, interval_str=""):
-        targets = []
-        # join all child series targets
-        for series in self.series_list:
-            targets += series.get_targets(interval_str=interval_str)
-        # remove duplicates (using a dict since lookup is a lot faster)
-        seen = {}
-        uniq_targets = []
+    def get_data(self, targets, start="", stop="", interval_str=""):
+        if isinstance(targets, basestring):
+            targets = [targets]
+        current_handlers = {}
         for target in targets:
-            if target in seen:
-                continue
-            seen[target] = 1
-            uniq_targets.append(target)
-        return uniq_targets
+            handler = self.get_handler(target)
+            if handler not in current_handlers:
+                current_handlers[handler] = []
+            current_handlers[handler].append(target)
+        data = []
+        for handler, targets in current_handlers.items():
+            max_targets = 5
+            while targets:
+                data += handler.get_data(targets[:max_targets], start=start,
+                                         stop=stop, interval_str=interval_str)
+                targets = targets[max_targets:]
 
-    def post_process_series(self, data):
-        new_data = []
-        for series in self.series_list:
-            new_data += series.post_process_series(data)
-        return new_data
-
-
-class CpuUtilSeries(SimpleSingleGraphiteSeries):
-    """Return CPU utilization as a percentage."""
-
-    alias = "cpu"
-
-    def get_inner_target(self):
-        return as_percent(
-            sum_series(exclude("%s.cpu.*.*" % self.head(), 'idle')),
-            sum_series("%s.cpu.*.*" % self.head())
-        )
-
-
-class LoadSeries(SimpleSingleGraphiteSeries):
-
-    alias = "load"
-
-    def get_inner_target(self):
-        return "%s.load.shortterm" % self.head()
-
-
-class NetSeries(SimpleSingleGraphiteSeries):
-
-    alias = "net"
-
-    def __init__(self, uuid, iface, direction, alias=""):
-        super(NetSeries, self).__init__(uuid, alias=alias)
-        self.iface = iface
-        self.direction = direction
-
-    def get_inner_target(self):
-        return "%s.interface.%s.if_octets.%s" % (
-            self.head(), self.iface, self.direction
-        )
+        # align start/stop
+        starts = set()
+        stops = set()
+        for item in data:
+            starts.add(item['datapoints'][0][1])
+            stops.add(item['datapoints'][-1][1])
+        start = max(starts) if len(starts) > 1 else 0
+        stop = min(stops) if len(stops) > 1 else 0
+        if start or stop:
+            log.debug("%s %s %s %s", starts, start, stops, stop)
+            for item in data:
+                if start:
+                    for i in range(len(item['datapoints'])):
+                        if item['datapoints'][i][1] >= start:
+                            if i:
+                                item['datapoints'] = item['datapoints'][i:]
+                            break
+                if stop:
+                    for i in range(len(item['datapoints'])):
+                        if item['datapoints'][-(i+1)][1] <= stop:
+                            if i:
+                                item['datapoints'] = item['datapoints'][:-i]
+                            break
+        return data
 
 
-class WildcardNetSeries(NetSeries):
-    def get_inner_target(self):
-        return sum_series(super(WildcardNetSeries, self).get_inner_target())
+class NoDataHandler(MultiHandler, CustomHandler):
+    plugin = "nodata"
 
+    def parse_target(self, target):
+        parts = super(NoDataHandler, self).parse_target(target)
+        if parts is not None:
+            return parts
+        log.error("%s() got invalid target: '%s'.",
+                  self.__class__.__name__, target)
 
-class NetEthRxSeries(WildcardNetSeries):
-    def __init__(self, uuid, alias="network-rx"):
-        super(NetEthRxSeries, self).__init__(uuid, alias=alias,
-                                             iface="eth*", direction="rx")
+    def decorate_target(self, target):
+        metric = super(NoDataHandler, self).decorate_target(target)
+        parts = self.parse_target(metric['alias'])
+        if parts is not None:
+            metric['name'] = "No Data"
+            metric['unit'] = "boolean"
+            metric['min_value'] = 0
+            metric['max_value'] = 1
+            metric['priority'] = 0
+        return metric
 
+    def find_metrics(self, plugin=""):
+        return [self.decorate_target("%(head)s.nodata")]
 
-class NetEthTxSeries(WildcardNetSeries):
-    def __init__(self, uuid, alias="network-tx"):
-        super(NetEthTxSeries, self).__init__(uuid, alias=alias,
-                                             iface="eth*", direction="tx")
-
-
-class NetAllSeries(CombinedGraphiteSeries):
-    """NetAllSeries merges NetRxSeries and NetTxSeries."""
-
-    def __init__(self, uuid):
-        series_list = [NetEthRxSeries(uuid), NetEthTxSeries(uuid)]
-        super(NetAllSeries, self).__init__(uuid, series_list)
-
-
-class MemSeries(SimpleSingleGraphiteSeries):
-
-    alias = "ram"
-
-    def get_inner_target(self):
-        return as_percent(
-            sum_series("%s.memory.{buffered,cached,used}" % self.head()),
-            sum_series("%s.memory.*" % self.head())
-
-        )
-
-
-class DiskSeries(SimpleSingleGraphiteSeries):
-
-    alias = "disk"
-
-    def __init__(self, uuid, direction, disk, alias=""):
-        super(DiskSeries, self).__init__(uuid, alias=alias)
-        self.direction = direction
-        self.disk = disk
-
-    def get_inner_target(self):
-        return "%s.disk.%s.disk_octets.%s" % (
-            self.head(), self.disk, self.direction
-        )
-
-
-class WildcardDiskSeries(DiskSeries):
-    def get_inner_target(self):
-        return sum_series(super(WildcardDiskSeries, self).get_inner_target())
-
-
-class DiskAllReadSeries(WildcardDiskSeries):
-    def __init__(self, uuid, alias="disk-read"):
-        super(DiskAllReadSeries, self).__init__(uuid, alias=alias,
-                                                disk="*", direction="read")
-
-
-class DiskAllWriteSeries(WildcardDiskSeries):
-    def __init__(self, uuid, alias="disk-write"):
-        super(DiskAllWriteSeries, self).__init__(uuid, alias=alias,
-                                                 disk="*", direction="write")
-
-
-class DiskAllSeries(CombinedGraphiteSeries):
-
-    def __init__(self, uuid):
-        series_list = [DiskAllReadSeries(uuid), DiskAllWriteSeries(uuid)]
-        super(DiskAllSeries, self).__init__(uuid, series_list)
-
-
-class AllSeries(CombinedGraphiteSeries):
-    """This combines several series (used by get_stats)"""
-
-    def __init__(self, uuid):
-        series_list = [
-            CpuUtilSeries(uuid),
-            MemSeries(uuid),
-            LoadSeries(uuid),
-            NetAllSeries(uuid),
-            DiskAllSeries(uuid),
+    def get_data(self, targets, start="", stop="", interval_str=""):
+        real_targets = [
+            "%(head)s.load.shortterm",
+            "%(head)s.load.midterm",
+            "%(head)s.cpu.0.idle",
         ]
-        super(AllSeries, self).__init__(uuid, series_list)
-
-
-class NoDataSeries(CombinedGraphiteSeries, SingleGraphiteSeries):
-    """Special series returning 0 or 1 values depending on whether there are
-    any data available."""
-
-    alias = "nodata"
-
-    def __init__(self, uuid, alias=""):
-        if alias:
-            self.alias = alias
-        series_list = [
-            #MemSeries(uuid),
-            LoadSeries(uuid),
-            #CpuUtilSeries(uuid),
-        ]
-        super(NoDataSeries, self).__init__(uuid, series_list)
-
-
-    def post_process_series(self, data):
-        """transform_null is ignored here."""
+        data = super(NoDataHandler, self).get_data(
+            real_targets, start=start, stop=stop, interval_str=interval_str
+        )
         points = {}
-        for series in self.series_list:
-            tmp_data = series.post_process_series(data)
-            for item in tmp_data:
-                for value, timestamp in item['datapoints']:
-                    if timestamp not in points:
-                        points[timestamp] = 1
-                    if value is not None:
-                        points[timestamp] = 0
-        if not points:
-            points[0] = 1
-        return [{
-            'target': self.alias,
-            'datapoints': [(points[ts], ts) for ts in sorted(points.keys())]
-        }]
+        for item in data:
+            for value, timestamp in item['datapoints']:
+                if timestamp not in points:
+                    points[timestamp] = 0
+                if value is not None:
+                    points[timestamp] += 1
+        # if not points:
+            # points[0] = 0
+        metric = self.find_metrics()[0]
+        metric['datapoints'] = [(1 if points[timestamp] == 0 else 0, timestamp)
+                                for timestamp in sorted(points.keys())]
+        return [metric]

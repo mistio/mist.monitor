@@ -103,8 +103,6 @@ def add_rule(request):
     operator = params["operator"]
     value = params["value"]
     reminder_list = params.get("reminder_list")
-    if metric in ['network-tx', 'disk-write']:
-        value = float(value) * 1024  # network-tx and disk-write are sent in KB/s
 
     methods.add_rule(uuid, rule_id, metric, operator, value, reminder_list)
     return OK
@@ -124,19 +122,16 @@ def get_stats(request):
 
     uuid = request.matchdict['machine']
     params = request.params
-    expression = params.get('expression')
+    metrics = params.getall('metric')
     start = params.get('start')
     stop = params.get('stop')
     interval_str = params.get('step')
-
-    if expression and isinstance(expression, basestring):
-        expression = expression.split(',')
 
     if re.match("^[0-9]+(\.[0-9]+)?$", interval_str):
         interval_str = int(interval_str)
         interval_str = "%ssec" % (interval_str)
 
-    return methods.get_stats(uuid, expression, start, stop, interval_str)
+    return methods.get_stats(uuid, metrics, start, stop, interval_str)
 
 
 @view_config(route_name='find_metrics', request_method='GET', renderer='json')
