@@ -41,13 +41,6 @@ redirect_stderr = false
 autorestart = true
 user = mist
 
-[program:collectd]
-command =  ${buildout:directory}/parts/collectd/sbin/collectd -f -C ${buildout:directory}/conf/collectd.conf
-process_name = collectd
-directory = ${buildout:directory}/parts/collectd/sbin
-priority = 20
-redirect_stderr = false
-
 [program:mongodb]
 command = ${buildout:directory}/bin/mongod  --journal --dbpath ${buildout:directory}/var/data --bind_ip 127.0.0.1 --master --port 27022 --nohttpinterface --logpath ${buildout:directory}/var/log/mongodb.log --directoryperdb
 process_name = mongodb
