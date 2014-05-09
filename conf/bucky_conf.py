@@ -36,7 +36,7 @@ collectd_enabled = True
 
 # A list of file names for collectd types.db
 # files.
-collectd_types = ["parts/collectd/share/collectd/types.db"]
+collectd_types = ["conf/types.db"]
 
 # A mapping of plugin names to converter callables. These are
 # explained in more detail in the README.
