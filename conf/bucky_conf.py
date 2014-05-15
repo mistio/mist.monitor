@@ -71,7 +71,7 @@ statsd_enabled = False
 ###### GRAPHITE ######
 # Basic Graphite configuration
 graphite_ip = "127.0.0.1"
-graphite_port = 2013  # should be the default of 2003
+graphite_port = 2014
 
 # If the Graphite connection fails these numbers define how it
 # will reconnect. The max reconnects applies each time a
@@ -84,7 +84,7 @@ graphite_port = 2013  # should be the default of 2003
 # Configuration for sending metrics to Graphite via the pickle
 # interface. Be sure to edit graphite_port to match the settings
 # on your Graphite cache/relay.
-#graphite_pickle_enabled = False
+graphite_pickle_enabled = True
 #graphite_pickle_buffer_size = 500
 
 ###### GENERAL SETTINGS ######
