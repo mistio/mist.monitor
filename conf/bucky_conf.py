@@ -2,7 +2,7 @@
 
 # Standard debug and log level
 #debug = False
-log_level = "DEBUG"  # "INFO"
+log_level = "INFO"  # DEBUG adds a considerable ammount of load
 log_fmt = "%(asctime)s [%(levelname)s] %(module)s - %(message)s"
 
 # Whether to print the entire stack trace for errors encountered
