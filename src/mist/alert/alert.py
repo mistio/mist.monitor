@@ -193,7 +193,6 @@ def check_machine(machine, rule_id=''):
         log.warning("  * no rules found")
         return
 
-    # combine all conditions to perform only one graphite query per machine
     try:
         data = handler.get_data(conditions.keys(), start='90')
     except GraphiteError as exc:
@@ -206,7 +205,7 @@ def check_machine(machine, rule_id=''):
         if target not in conditions:
             log.warning("get data returned unexpected target %s", target)
             continue
-        condition = conditions[target]
+        condition = conditions.pop(target)
         datapoints = [(val, ts) for val, ts in item['datapoints']
                       if val is not None]
         if not datapoints:
@@ -214,6 +213,11 @@ def check_machine(machine, rule_id=''):
                         condition.rule_id, condition)
             continue
         check_condition(condition, datapoints)
+
+    if conditions:
+        for condition in conditions:
+            log.warning("  * rule '%s' (%s):Metric not found for rule.",
+                        condition.rule_id, condition)
 
 
 def main():
