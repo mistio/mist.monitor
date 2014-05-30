@@ -215,7 +215,7 @@ def check_machine(machine, rule_id=''):
         check_condition(condition, datapoints)
 
     if conditions:
-        for condition in conditions:
+        for condition in conditions.values():
             log.warning("  * rule '%s' (%s):Metric not found for rule.",
                         condition.rule_id, condition)
 
