@@ -179,8 +179,8 @@ def check_machine(machine, rule_id=''):
                         " got updated. Will check on next run.", rule_id)
             continue
         target = old_targets.get(condition.metric, condition.metric)
-        if "%(head)s." not in target:
-            target = "%(head)s." + target
+        ## if "%(head)s." not in target:
+            ## target = "%(head)s." + target
         if condition.operator not in OPERATORS_MAP:
             log.error("  * rule '%s' (%s):Unknown operator '%s'.",
                       rule_id, condition, condition.operator)
@@ -201,7 +201,7 @@ def check_machine(machine, rule_id=''):
 
     # check all conditions
     for item in data:
-        target = item['target']
+        target = item['alias']  # take the pseudotarget
         if target not in conditions:
             log.warning("get data returned unexpected target %s", target)
             continue
