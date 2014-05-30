@@ -47,7 +47,9 @@ class GenericHandler(object):
         if isinstance(targets, basestring):
             targets = [targets]
         clean_targets = []
+        real_to_requested = {}
         for target in targets:
+            requested_target = target
             target, _alias = self.target_alias(target)
             if target:
                 # target = target % {'head': self.head()}
@@ -58,6 +60,7 @@ class GenericHandler(object):
                     # if alias different than target, or summarize() added to
                     # target, use alias to not screw with the return target
                     target = alias(target, _alias)
+                real_to_requested[_alias] = requested_target
                 clean_targets.append(target % {'head': self.head()})
         url = self.get_graphite_render_url(clean_targets,
                                            start=start, stop=stop)
@@ -65,6 +68,7 @@ class GenericHandler(object):
         data = resp.json()
         for item in data:
             item.update(self.decorate_target(item['target']))
+            item['_requested_target'] = real_to_requested.get(item['alias'])
         return data
 
     def get_graphite_render_url(self, targets, start="", stop="",

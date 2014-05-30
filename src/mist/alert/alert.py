@@ -201,7 +201,7 @@ def check_machine(machine, rule_id=''):
 
     # check all conditions
     for item in data:
-        target = item['alias']  # take the pseudotarget
+        target = item['_requested_target']
         if target not in conditions:
             log.warning("get data returned unexpected target %s", target)
             continue
