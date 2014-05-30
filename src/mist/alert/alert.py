@@ -179,10 +179,8 @@ def check_machine(machine, rule_id=''):
                         " got updated. Will check on next run.", rule_id)
             continue
         target = old_targets.get(condition.metric, condition.metric)
-        if "%(head)s" not in target:
-            log.error("  * rule '%s' (%s):Unknown target '%s'.",
-                      rule_id, condition, target)
-            continue
+        if "%(head)s." not in target:
+            target = "%(head)s." + target
         if condition.operator not in OPERATORS_MAP:
             log.error("  * rule '%s' (%s):Unknown operator '%s'.",
                       rule_id, condition, condition.operator)
