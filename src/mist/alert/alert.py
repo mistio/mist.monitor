@@ -190,6 +190,7 @@ def check_machine(machine, rule_id=''):
             continue
         conditions[target] = condition
     if not conditions:
+        log.warning("  * no rules found")
         return
 
     # combine all conditions to perform only one graphite query per machine
