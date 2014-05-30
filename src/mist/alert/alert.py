@@ -5,17 +5,7 @@ from time import time, sleep
 
 from mist.monitor.model import get_all_machines
 
-from mist.monitor.graphite import SingleGraphiteSeries
-from mist.monitor.graphite import CombinedGraphiteSeries
-from mist.monitor.graphite import CustomSingleGraphiteSeries
-from mist.monitor.graphite import NoDataSeries
-from mist.monitor.graphite import CpuUtilSeries
-from mist.monitor.graphite import LoadSeries
-from mist.monitor.graphite import MemSeries
-from mist.monitor.graphite import DiskAllWriteSeries
-from mist.monitor.graphite import DiskAllReadSeries
-from mist.monitor.graphite import NetEthRxSeries
-from mist.monitor.graphite import NetEthTxSeries
+from mist.monitor.graphite import MultiHandler
 
 from mist.monitor.helpers import tdelta_to_str
 
@@ -29,18 +19,6 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 log.addHandler(ch)
-
-
-BUILTIN_METRICS = {
-    'nodata': NoDataSeries,
-    'cpu': CpuUtilSeries,
-    'load': LoadSeries,
-    'ram': MemSeries,
-    'disk-read': DiskAllReadSeries,
-    'disk-write': DiskAllWriteSeries,
-    'network-rx': NetEthRxSeries,
-    'network-tx': NetEthTxSeries,
-}
 
 
 def gt(datapoints, threshold):
@@ -163,12 +141,23 @@ def check_machine(machine, rule_id=''):
 
     log.info("Checking machine '%s':", machine.uuid)
 
+    old_targets = {
+        'cpu': 'cpu.total.nonidle',
+        'load': 'load.shorterm',
+        'ram': 'memory.nonfree_percent',
+        'disk-read': 'disk.total.disk_octets.read',
+        'disk-write': 'disk.total.disk_octets.write',
+        'network-rx': 'interface.total.if_octets.rx',
+        'network-tx': 'interface.total.if_octets.tx',
+    }
+
+    handler = MultiHandler(machine.uuid)
+
     # check if machine activated
     if not machine.activated:
         log.info("  * Machine is not yet activated (inactive for %s).",
-                 tdelta_to_str(time()-machine.enabled_time))
-        nodata_series = NoDataSeries(machine.uuid)
-        if nodata_series.check_head():
+                 tdelta_to_str(time() - machine.enabled_time))
+        if handler.check_head():
             log.info("  * Machine just got activated!")
             with machine.lock_n_load():
                 machine.activated = True
@@ -180,7 +169,7 @@ def check_machine(machine, rule_id=''):
         return
 
     # gather all conditions
-    conditions = []
+    conditions = {}
     rules = [rule_id] if rule_id else machine.rules
     for rule_id in rules:
         try:
@@ -189,11 +178,11 @@ def check_machine(machine, rule_id=''):
             log.warning("  * rule '%s':Condition not found, probably rule just"
                         " got updated. Will check on next run.", rule_id)
             continue
-        if condition.metric not in BUILTIN_METRICS:
-            if "%(head)s" not in condition.metric:
-                log.error("  * rule '%s' (%s):Unknown metric '%s'.",
-                          rule_id, condition, condition.metric)
-                continue
+        target = old_targets.get(condition.metric, condition.metric)
+        if "%(head)s" not in target:
+            log.error("  * rule '%s' (%s):Unknown target '%s'.",
+                      rule_id, condition, target)
+            continue
         if condition.operator not in OPERATORS_MAP:
             log.error("  * rule '%s' (%s):Unknown operator '%s'.",
                       rule_id, condition, condition.operator)
@@ -201,33 +190,25 @@ def check_machine(machine, rule_id=''):
         if condition.active_after > time():
             log.info("  * rule '%s' (%s):Not yet active.", rule_id, condition)
             continue
-        conditions.append(condition)
+        conditions[target] = condition
     if not conditions:
         return
 
     # combine all conditions to perform only one graphite query per machine
-    conditions_series = {}
-    for condition in conditions:
-        if condition.metric in BUILTIN_METRICS:
-            series = BUILTIN_METRICS[condition.metric](machine.uuid)
-        else:
-            series = CustomSingleGraphiteSeries(machine.uuid,
-                                                target=condition.metric)
-        conditions_series[condition.cond_id] = series
-    combined_series = CombinedGraphiteSeries(machine.uuid,
-                                             conditions_series.values())
     try:
-        data = combined_series.get_series("-70sec", process=False)
+        data = handler.get_data(conditions.keys(), start='90')
     except GraphiteError as exc:
         log.warning("%r", exc)
         return
 
     # check all conditions
-    for condition in conditions:
-        series = conditions_series[condition.cond_id]
-        tmp_data = series.post_process_series(data)
-        datapoints = tmp_data[0]['datapoints']
-        datapoints = [point for point in datapoints if point[0] is not None]
+    for item in data:
+        target = item['target']
+        if target not in conditions:
+            log.warning("get data returned unexpected target %s", target)
+        condition = conditions[target]
+        datapoints = [(val, ts) for val, ts in item['datapoints']
+                      if val is not None]
         if not datapoints:
             log.warning("  * rule '%s' (%s):No data for rule.",
                         condition.rule_id, condition)
