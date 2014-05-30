@@ -204,6 +204,7 @@ def check_machine(machine, rule_id=''):
         target = item['target']
         if target not in conditions:
             log.warning("get data returned unexpected target %s", target)
+            continue
         condition = conditions[target]
         datapoints = [(val, ts) for val, ts in item['datapoints']
                       if val is not None]
