@@ -30,13 +30,16 @@ metricsd_enabled = False
 
 ###### COLLECTD ######
 # Basic collectd configuration
-collectd_ip = "127.0.0.1"
-collectd_port = 25827  # 25826 is used by the intermediate collectd server
+collectd_ip = "0.0.0.0"
+collectd_port = 25826  # 25826 is used by the intermediate collectd server
 collectd_enabled = True
+
+collectd_auth_file = "/home/mist/mist.monitor/conf/collectd.passwd"
+collectd_security_level = 2  # 0: None, 1: Sign, 2: Encrypt
 
 # A list of file names for collectd types.db
 # files.
-collectd_types = ["parts/collectd/share/collectd/types.db"]
+collectd_types = ["conf/types.db"]
 
 # A mapping of plugin names to converter callables. These are
 # explained in more detail in the README.
