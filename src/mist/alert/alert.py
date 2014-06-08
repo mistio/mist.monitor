@@ -143,7 +143,7 @@ def check_machine(machine, rule_id=''):
 
     old_targets = {
         'cpu': 'cpu.total.nonidle',
-        'load': 'load.shorterm',
+        'load': 'load.shortterm',
         'ram': 'memory.nonfree_percent',
         'disk-read': 'disk.total.disk_octets.read',
         'disk-write': 'disk.total.disk_octets.write',
