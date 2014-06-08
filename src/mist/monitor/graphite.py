@@ -517,12 +517,13 @@ class MultiHandler(GenericHandler):
     def __init__(self, uuid):
         super(MultiHandler, self).__init__(uuid)
         self.handlers = {
-            'generic': GenericHandler(uuid),
-            'interface': InterfaceHandler(uuid),
-            'disk': DiskHandler(uuid),
-            'load': LoadHandler(uuid),
-            'cpu': CpuHandler(uuid),
-            'memory': MemoryHandler(uuid),
+            'generic': GenericHandler,
+            'interface': InterfaceHandler,
+            'disk': DiskHandler,
+            'load': LoadHandler,
+            'cpu': CpuHandler,
+            'memory': MemoryHandler,
+            'nodata': NoDataHandler,
         }
         self.vtargets = []
 
@@ -536,7 +537,7 @@ class MultiHandler(GenericHandler):
                 if parts[1] in self.handlers:
                     plugin = parts[1]
         log.debug("get_handler plugin: %s", plugin)
-        return self.handlers[plugin]
+        return self.handlers[plugin](self.uuid)
 
     def find_metrics(self, plugin=""):
         if plugin:
