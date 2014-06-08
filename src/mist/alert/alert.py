@@ -194,7 +194,7 @@ def check_machine(machine, rule_id=''):
         return
 
     try:
-        data = handler.get_data(conditions.keys(), start='90')
+        data = handler.get_data(conditions.keys(), start='-90sec')
     except GraphiteError as exc:
         log.warning("%r", exc)
         return
