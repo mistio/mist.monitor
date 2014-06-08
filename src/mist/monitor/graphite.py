@@ -641,4 +641,5 @@ class NoDataHandler(MultiHandler, CustomHandler):
         metric = self.find_metrics()[0]
         metric['datapoints'] = [(1 if points[timestamp] == 0 else 0, timestamp)
                                 for timestamp in sorted(points.keys())]
+        metric['_requested_target'] = "nodata"
         return [metric]
