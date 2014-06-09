@@ -8,25 +8,20 @@ import multiprocessing
 
 from bucky.names import statname
 
-from mist.monitor.graphite import LoadSeries
-
 
 log = logging.getLogger(__name__)
 
 
 class NewMetricsObserver(object):
     def __init__(self):
-        self.metrics = {}
+        self.metrics = set()
         self.queue = multiprocessing.Queue()
         self.dispatcher = NewMetricsDispatcher(self.queue, flush=10)
         self.dispatcher.start()
 
     def __call__(self, host, name, val, timestamp):
-        if host not in self.metrics:
-            log.info("Found new host: '%s'.", host)
-            self.metrics[host] = set()
-        if name not in self.metrics[host]:
-            prefix = "%s." % LoadSeries(host).head()
+        if (host, name) not in self.metrics:
+            prefix = "bucky.%s." % host
             metric = statname(host, name).replace(prefix, "%(head)s.")
             log.info("Found new metric '%s' for host '%s'.", metric, host)
             try:
@@ -34,7 +29,7 @@ class NewMetricsObserver(object):
             except Queue.Full:
                 log.warning("Queue full while pushing new metric.")
             else:
-                self.metrics[host].add(name)
+                self.metrics.add((host, name))
         return host, name, val, timestamp
 
 
@@ -76,4 +71,3 @@ class NewMetricsDispatcher(threading.Thread):
                      counter, len(new_metrics))
             payload = json.dumps(new_metrics)
             log.info("Request payload is %d bytes.", len(payload))
-
