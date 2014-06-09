@@ -123,5 +123,12 @@ name_strip_duplicates = True
 #    print host, name, val, time
 #    return host, name, val, time
 #processor = debug_proc
+
 from mist.bucky_extras.processors.timeprocessor import TimeConverterSingleThread
-processor = TimeConverterSingleThread(13)
+from mist.bucky_extras.processors.core_observer import NewMetricsObserver
+from mist.bucky_extras.processors.composite import gen_composite_processor
+
+processor = gen_composite_processor(
+    TimeConverterSingleThread(13),
+    NewMetricsObserver(),
+)
