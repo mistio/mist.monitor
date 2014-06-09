@@ -8,6 +8,9 @@ import multiprocessing
 
 from bucky.names import statname
 
+from mist.monitor import config as mon_config
+from mist.monitor.model import get_machine_from_uuid
+
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +40,11 @@ class NewMetricsDispatcher(threading.Thread):
         self.daemon = True
         self.flush = flush
 
+        self.ignore_plugins = set([
+            "cpu", "df", "md", "thermal", "disk", "entropy", "interface",
+            "load", "memory", "processes", "swap", "users", "ping", "network",
+        ])
+
     def run(self):
         while True:
             start = time.time()
@@ -58,16 +66,38 @@ class NewMetricsDispatcher(threading.Thread):
                 host, name = self.queue.get(block=False)
             except Queue.Empty:
                 break
-            prefix = "bucky.%s." % host
-            metric = statname(host, name).replace(prefix, "%(head)s.")
-            log.info("Found new metric '%s' for host '%s'.", metric, host)
-            if host not in new_metrics:
-                new_metrics[host] = []
-            new_metrics[host].append(metric)
+            metric = statname(host, name).replace("bucky.%s." % host, "")
+            plugin = metric.split(".")[0]
+            if plugin not in self.ignore_plugins:
+                log.info("Found new metric '%s' for host '%s'.", metric, host)
+                if host not in new_metrics:
+                    new_metrics[host] = []
+                new_metrics[host].append(metric)
             counter += 1
 
-        if new_metrics:
-            log.info("Notifying core about %d new metrics for %d hosts.",
-                     counter, len(new_metrics))
-            payload = json.dumps(new_metrics)
-            log.info("Request payload is %d bytes.", len(payload))
+        for host, metrics in new_metrics.items():
+            self.dispatch(host, metrics)
+
+    def dispatch(self, host, metrics):
+        print host, metrics
+        machine = get_machine_from_uuid(host)
+        if not machine:
+            log.warning("machine not found, wtf!")
+            return
+        payload = {
+            'uuid': host,
+            'collectd_password': machine.collectd_password,
+            'metrics': ["%(head)s." + metric for metric in metrics],
+        }
+        url = "%s/new_metrics" % mon_config.CORE_URI
+        try:
+            resp = requests.post(
+                "%s/new_metrics" % mon_config.CORE_URI,
+                data=json.dumps(payload),
+                verify=mon_config.SSL_VERIFY
+            )
+        except Exception as exc:
+            log.error("Error notifying core: %r", exc)
+            return
+        if not resp.ok:
+            log.error("Bad response from core: %s", resp.text)
