@@ -21,11 +21,8 @@ class NewMetricsObserver(object):
 
     def __call__(self, host, name, val, timestamp):
         if (host, name) not in self.metrics:
-            prefix = "bucky.%s." % host
-            metric = statname(host, name).replace(prefix, "%(head)s.")
-            log.info("Found new metric '%s' for host '%s'.", metric, host)
             try:
-                self.queue.put((host, metric), block=False)
+                self.queue.put((host, name), block=False)
             except Queue.Full:
                 log.warning("Queue full while pushing new metric.")
             else:
@@ -58,9 +55,12 @@ class NewMetricsDispatcher(threading.Thread):
         counter = 0
         while True:
             try:
-                host, metric = self.queue.get(block=False)
+                host, name = self.queue.get(block=False)
             except Queue.Empty:
                 break
+            prefix = "bucky.%s." % host
+            metric = statname(host, name).replace(prefix, "%(head)s.")
+            log.info("Found new metric '%s' for host '%s'.", metric, host)
             if host not in new_metrics:
                 new_metrics[host] = []
             new_metrics[host].append(metric)
