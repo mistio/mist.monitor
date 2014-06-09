@@ -215,9 +215,13 @@ def check_machine(machine, rule_id=''):
         check_condition(condition, datapoints)
 
     if conditions:
-        for condition in conditions.values():
+        for target, condition in conditions.items():
             log.warning("  * rule '%s' (%s):Metric not found for rule.",
                         condition.rule_id, condition)
+            if target == "nodata":
+                # if nodata rule didn't return any datapoints, the whisper
+                # files must be missing, so make the rule true
+                check_condition(condition, [(1, 0)])
 
 
 def main():

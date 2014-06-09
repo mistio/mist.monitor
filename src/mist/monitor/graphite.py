@@ -636,8 +636,9 @@ class NoDataHandler(MultiHandler, CustomHandler):
                     points[timestamp] = 0
                 if value is not None:
                     points[timestamp] += 1
-        # if not points:
+        if not points:
             # points[0] = 0
+            return []
         metric = self.find_metrics()[0]
         metric['datapoints'] = [(1 if points[timestamp] == 0 else 0, timestamp)
                                 for timestamp in sorted(points.keys())]
