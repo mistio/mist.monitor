@@ -9,29 +9,13 @@ log_fmt = "%(asctime)s [%(levelname)s] %(module)s - %(message)s"
 # when loading the config file
 full_trace = True
 
-###### METRICSD ######
-# Basic metricsd conifguration
-#metricsd_ip = "127.0.0.1"
-#metricsd_port = 23632
 metricsd_enabled = False
-
-# The default interval between flushes of metric data to Graphite
-#metricsd_default_interval = 10.0
-
-# You can specify the frequency of flushes to Graphite based on
-# the metric name used for each metric. These are specified as
-# regular expressions. An entry in this list should be a 3-tuple
-# that is: (regexp, frequency, priority)
-#
-# The regexp is applied with the match method. Frequency should be
-# in seconds. Priority is used to break ties when a metric name
-# matches more than one handler. (The largest priority wins)
-#metricsd_handlers = []
+statsd_enabled = False
 
 ###### COLLECTD ######
 # Basic collectd configuration
 collectd_ip = "0.0.0.0"
-collectd_port = 25826  # 25826 is used by the intermediate collectd server
+collectd_port = 25826
 collectd_enabled = True
 
 collectd_auth_file = "/home/mist/mist.monitor/conf/collectd.passwd"
@@ -48,28 +32,6 @@ collectd_types = ["conf/types.db"]
 # Whether to load converters from entry points. The entry point
 # used to define converters is 'bucky.collectd.converters'.
 ## collectd_use_entry_points = True
-
-###### STATSD ######
-# Basic statsd configuration
-#statsd_ip = "127.0.0.1"
-#statsd_port = 8125
-statsd_enabled = False
-
-# How often stats should be flushed to Graphite.
-#statsd_flush_time = 10.0
-
-# If the legacy namespace is enabled, the statsd backend uses the
-# default prefixes except for counters, which are stored directly
-# in stats.NAME for the rate and stats_counts.NAME for the
-# absolute count.  If legacy names are disabled, the prefixes are
-# configurable, and counters are stored under
-# stats.counters.{rate,count} by default.  Any prefix can be set
-# to None to skip it.
-#statsd_legacy_namespace = True
-#statsd_global_prefix = "stats"
-#statsd_prefix_counter = "counters"
-#statsd_prefix_timer = "timers"
-#statsd_prefix_gauge = "gauges"
 
 ###### GRAPHITE ######
 # Basic Graphite configuration
@@ -123,5 +85,12 @@ name_strip_duplicates = True
 #    print host, name, val, time
 #    return host, name, val, time
 #processor = debug_proc
+
 from mist.bucky_extras.processors.timeprocessor import TimeConverterSingleThread
-processor = TimeConverterSingleThread(13)
+from mist.bucky_extras.processors.core_observer import NewMetricsObserver
+from mist.bucky_extras.processors.composite import gen_composite_processor
+
+processor = gen_composite_processor(
+    TimeConverterSingleThread(13),
+    NewMetricsObserver(),
+)
