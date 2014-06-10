@@ -28,9 +28,6 @@ def update_collectd_conf():
     """Update collectd.passwd and collectd.conf.local file.
 
     Reconstructs collectd.passwd adding a uuid/password entry for every machine.
-    Reconstructs collectd.conf.local adding an Import statement for every
-    machine.
-    Sends a SIGHUP to collectd to load fresh configuration.
 
     """
 
@@ -38,27 +35,6 @@ def update_collectd_conf():
              for machine in get_all_machines()]
     with open(os.getcwd() + "/conf/collectd.passwd", "w") as f:
         f.writelines(lines)
-
-    import_lines = []
-    passwd_lines = []
-    for machine in get_all_machines():
-        rule_filepath = os.getcwd() + "/conf/collectd_%s.conf" % machine.uuid
-        import_lines.append('Include "%s"\n' % rule_filepath)
-        passwd_lines.append("%s: %s\n" % (machine.uuid,
-                                          machine.collectd_password))
-
-    passwd_filepath = os.getcwd() + "/conf/collectd.passwd"
-    with open(passwd_filepath + ".tmp", "w") as f:
-        f.writelines(passwd_lines)
-    os.rename(passwd_filepath + ".tmp", passwd_filepath)
-
-    imports_filepath = os.getcwd() + "/conf/collectd.conf.local"
-    with open(imports_filepath + ".tmp", "w") as f:
-        f.writelines(import_lines)
-    os.rename(imports_filepath + ".tmp", imports_filepath)
-
-    # send a SIGHUP to collectd to reload configuration."""
-    call(['/usr/bin/pkill', '-HUP', 'collectd'])
 
 
 def add_machine(uuid, password, update_collectd=True):
@@ -83,24 +59,7 @@ def add_machine(uuid, password, update_collectd=True):
         machine.enabled_time = time()
         machine.create()
 
-    # Create new collectd conf to make collectd only accept data for a certain
-    # machine from requests coming from the machine with the right uuid.
-    chain_rule = """PreCacheChain "%(uuid)sRule"
-    <Chain "%(uuid)sRule">
-        <Rule "rule">
-            <Match "regex">
-                Host "^%(uuid)s$"
-            </Match>
-            Target return
-        </Rule>
-        Target continue
-    </Chain>
-    """ % {'uuid': uuid}
-    rule_filepath = os.getcwd() + "/conf/collectd_%s.conf" % machine.uuid
-    with open(rule_filepath, "w") as f:
-        f.write(chain_rule)
-
-    # add uuid/passwd in collectd conf and import chain rule
+    # add uuid/passwd in collectd.passwd
     if update_collectd:
         update_collectd_conf()
 
@@ -126,10 +85,7 @@ def remove_machine(uuid):
 
     machine.delete()
 
-    # Remove chain rule file.
-    os.remove(os.getcwd() + "/conf/collectd_%s.conf" % machine.uuid)
-
-    # reconstruct collectd passwords file to remove uuid/passwd and import
+    # reconstruct collectd passwords file to remove uuid/passwd
     update_collectd_conf()
 
 
