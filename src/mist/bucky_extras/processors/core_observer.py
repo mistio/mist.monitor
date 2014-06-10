@@ -89,7 +89,7 @@ class NewMetricsDispatcher(threading.Thread):
             'collectd_password': machine.collectd_password,
             'metrics': metrics,
         }
-        url = "%s/new_metrics" % mon_config.CORE_URI
+        log.info("Notifying core: %s", payload)
         try:
             resp = requests.post(
                 "%s/new_metrics" % mon_config.CORE_URI,
