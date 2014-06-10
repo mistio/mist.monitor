@@ -19,7 +19,7 @@ class NewMetricsObserver(object):
     def __init__(self):
         self.metrics = set()
         self.queue = multiprocessing.Queue()
-        self.dispatcher = NewMetricsDispatcher(self.queue, flush=10)
+        self.dispatcher = NewMetricsDispatcher(self.queue, flush=1)
         self.dispatcher.start()
 
     def __call__(self, host, name, val, timestamp):
@@ -87,7 +87,7 @@ class NewMetricsDispatcher(threading.Thread):
         payload = {
             'uuid': host,
             'collectd_password': machine.collectd_password,
-            'metrics': ["%(head)s." + metric for metric in metrics],
+            'metrics': metrics,
         }
         url = "%s/new_metrics" % mon_config.CORE_URI
         try:
