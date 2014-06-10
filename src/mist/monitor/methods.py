@@ -4,11 +4,14 @@ import logging
 from subprocess import call
 from time import time
 
+log = logging.getLogger(__name__)
+
 try:
-  import fcntl
-  CAN_LOCK = True
+    import fcntl
+    CAN_LOCK = True
 except ImportError:
-  CAN_LOCK = False
+    log.error("Can't import fcntl module, won't lock collectd.passwd")
+    CAN_LOCK = False
 
 from mist.monitor import config
 from mist.monitor import graphite
@@ -25,9 +28,6 @@ from mist.monitor.exceptions import MachineNotFoundError
 from mist.monitor.exceptions import RuleNotFoundError
 from mist.monitor.exceptions import MachineExistsError
 from mist.monitor.exceptions import BadRequestError
-
-
-log = logging.getLogger(__name__)
 
 
 def update_collectd_conf():
