@@ -513,6 +513,34 @@ class MemoryHandler(CustomHandler):
         return target, alias
 
 
+class PingHandler(CustomHandler):
+    plugin = "ping"
+
+    def parse_target(self, target):
+        parts = super(PingHandler, self).parse_target(target)
+        if parts is not None:
+            if len(parts) == 2:
+                kind, host = parts
+                return kind, host.replace("_", ".")
+            elif len(parts) == 1:
+                kind, host = None, parts[0]
+                return kind, host.replace("_", ".")
+        log.error("%s() got invalid target: '%s'.",
+                  self.__class__.__name__, target)
+
+    def decorate_target(self, target):
+        metric = super(PingHandler, self).decorate_target(target)
+        parts = self.parse_target(metric['alias'])
+        if parts is not None:
+            kind, host = parts
+            if kind:
+                name = "Ping %s %s" % (kind, host)
+            else:
+                name = "Ping %s" % host
+            metric['priority'] = 0
+        return metric
+
+
 class MultiHandler(GenericHandler):
     def __init__(self, uuid):
         super(MultiHandler, self).__init__(uuid)
@@ -523,6 +551,7 @@ class MultiHandler(GenericHandler):
             'load': LoadHandler,
             'cpu': CpuHandler,
             'memory': MemoryHandler,
+            'ping': PingHandler,
             'nodata': NoDataHandler,
         }
         self.vtargets = []
@@ -594,34 +623,6 @@ class MultiHandler(GenericHandler):
                                 item['datapoints'] = item['datapoints'][:-i]
                             break
         return data
-
-
-class PingHandler(CustomHandler):
-    plugin = "ping"
-
-    def parse_target(self, target):
-        parts = super(PingHandler, self).parse_target(target)
-        if parts is not None:
-            if len(parts) == 2:
-                kind, host = parts
-                return kind, host.replace("_", ".")
-            elif len(parts) == 1:
-                kind, host = None, parts[0]
-                return kind, host.replace("_", ".")
-        log.error("%s() got invalid target: '%s'.",
-                  self.__class__.__name__, target)
-
-    def decorate_target(self, target):
-        metric = super(PingHandler, self).decorate_target(target)
-        parts = self.parse_target(metric['alias'])
-        if parts is not None:
-            kind, host = parts
-            if kind:
-                name = "Ping %s %s" % (kind, host)
-            else:
-                name = "Ping %s" % host
-            metric['priority'] = 0
-        return metric
 
 
 class NoDataHandler(MultiHandler, CustomHandler):
