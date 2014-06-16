@@ -5,5 +5,5 @@ class PingConverter(object):
     def __init__(self):
         self.default_converter = DefaultConverter()
     def __call__(self, sample):
-        print sample
+        sample['type_instance'] = sample['type_instance'].replace('.', '_')
         return self.default_converter(sample)
