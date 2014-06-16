@@ -537,6 +537,7 @@ class PingHandler(CustomHandler):
                 name = "Ping %s %s" % (kind, host)
             else:
                 name = "Ping %s" % host
+            metric['name'] = name
             metric['priority'] = 0
         return metric
 
