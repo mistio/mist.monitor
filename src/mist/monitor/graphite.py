@@ -521,10 +521,12 @@ class PingHandler(CustomHandler):
         if parts is not None:
             if len(parts) == 2:
                 kind, host = parts
+                if kind.startswith("ping_"):
+                    kind = kind[5:]
                 return kind, host.replace("_", ".")
             elif len(parts) == 1:
-                kind, host = None, parts[0]
-                return kind, host.replace("_", ".")
+                host = parts[0]
+                return "rtt", host.replace("_", ".")
         log.error("%s() got invalid target: '%s'.",
                   self.__class__.__name__, target)
 
@@ -533,11 +535,9 @@ class PingHandler(CustomHandler):
         parts = self.parse_target(metric['alias'])
         if parts is not None:
             kind, host = parts
-            if kind:
-                name = "Ping %s %s" % (kind, host)
-            else:
-                name = "Ping %s" % host
-            metric['name'] = name
+            metric['name'] = "Ping %s %s" % (kind, host)
+            if kind == "rtt":
+                metric['unit'] = 'ms'
             metric['priority'] = 0
         return metric
 
