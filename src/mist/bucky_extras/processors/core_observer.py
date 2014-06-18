@@ -16,10 +16,29 @@ log = logging.getLogger(__name__)
 
 
 class NewMetricsObserver(object):
-    def __init__(self):
+    def __init__(self, path=""):
         self.metrics = set()
         self.queue = multiprocessing.Queue()
-        self.dispatcher = NewMetricsDispatcher(self.queue, flush=1)
+        if path:
+            # load metrics from file (to persist restart of bucky)
+            try:
+                f = open(path)
+            except IOError as exc:
+                log.warning("Error opening metrics file: %s", exc)
+            else:
+                for line in f:
+                    line = line.strip()
+                    parts = line.split()
+                    if len(parts) == 2:
+                        host, name = parts
+                        self.metrics.add((host, name))
+                    else:
+                        log.error("Invalid line in '%s': 's'", path, line)
+                log.info("Loaded %d metrics from file", len(self.metrics))
+                f.close()
+        else:
+            log.warning("No path configured to persist discovered metrics")
+        self.dispatcher = NewMetricsDispatcher(self.queue, path=path, flush=1)
         self.dispatcher.start()
 
     def __call__(self, host, name, val, timestamp):
@@ -34,16 +53,21 @@ class NewMetricsObserver(object):
 
 
 class NewMetricsDispatcher(threading.Thread):
-    def __init__(self, queue, flush=5):
+    def __init__(self, queue, path="", flush=5):
         super(NewMetricsDispatcher, self).__init__()
         self.queue = queue
         self.daemon = True
         self.flush = flush
-
         self.ignore_plugins = set([
             "cpu", "df", "md", "thermal", "disk", "entropy", "interface",
             "load", "memory", "processes", "swap", "users", "ping", "network",
         ])
+        self.fh = None
+        if path:
+            try:
+                self.fh = open(path, 'a')
+            except IOError as exc:
+                log.error("Error opening metrics file for writing!")
 
     def run(self):
         while True:
@@ -59,37 +83,41 @@ class NewMetricsDispatcher(threading.Thread):
 
     def run_once(self):
         """Read and parse entire queue and notify core."""
-        new_metrics = {}
+        new_names = {}
         counter = 0
         while True:
             try:
                 host, name = self.queue.get(block=False)
             except Queue.Empty:
                 break
+            if host not in new_names:
+                new_names[host] = []
+            new_names[host].append(name)
+            counter += 1
+
+        for host, names in new_names.items():
+            self.dispatch(host, names)
+
+    def dispatch(self, host, names):
+        machine = get_machine_from_uuid(host)
+        if not machine:
+            log.error("machine not found, wtf!")
+            return
+        metrics = set()
+        for name in names:
             metric = statname(host, name).replace("bucky.%s." % host, "")
             plugin = metric.split(".")[0]
             if plugin not in self.ignore_plugins:
-                log.info("Found new metric '%s' for host '%s'.", metric, host)
-                if host not in new_metrics:
-                    new_metrics[host] = []
-                new_metrics[host].append(metric)
-            counter += 1
-
-        for host, metrics in new_metrics.items():
-            self.dispatch(host, metrics)
-
-    def dispatch(self, host, metrics):
-        print host, metrics
-        machine = get_machine_from_uuid(host)
-        if not machine:
-            log.warning("machine not found, wtf!")
+                metrics.add(metric)
+        if not metrics:
             return
+        metrics = list(metrics)
+        log.info("New metrics for host %s, notifying core: %s", host, metrics)
         payload = {
             'uuid': host,
             'collectd_password': machine.collectd_password,
             'metrics': metrics,
         }
-        log.info("Notifying core: %s", payload)
         try:
             resp = requests.post(
                 "%s/new_metrics" % mon_config.CORE_URI,
@@ -101,3 +129,11 @@ class NewMetricsDispatcher(threading.Thread):
             return
         if not resp.ok:
             log.error("Bad response from core: %s", resp.text)
+        # also save to file in disk
+        if self.fh is not None:
+            try:
+                for name in names:
+                    self.fh.write("%s %s\n" % (host, name))
+                self.fh.flush()
+            except IOError as exc:
+                log.error("Error writing to metrics file: %s", exc)
