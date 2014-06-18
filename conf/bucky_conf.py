@@ -93,5 +93,5 @@ from mist.bucky_extras.processors.composite import gen_composite_processor
 
 processor = gen_composite_processor(
     TimeConverterSingleThread(13),
-    NewMetricsObserver(),
+    NewMetricsObserver(path='conf/discovered_metrics.conf'),
 )

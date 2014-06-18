@@ -16,6 +16,7 @@ conf/collectd.conf
 conf/collectd.conf.local
 conf/collectd.passwd
 conf/collectd_*
+conf/discovered_metrics.conf
 local/
 src/carbon/
 src/ceres/
