@@ -27,7 +27,7 @@ collectd_types = ["conf/types.db"]
 
 # A mapping of plugin names to converter callables. These are
 # explained in more detail in the README.
-from mist.bucky_extras.collectd_converters.ping import PingConverter
+from mist.bucky_extras.collectd_converters import PingConverter
 collectd_converters = {'ping': PingConverter()}
 
 # Whether to load converters from entry points. The entry point
