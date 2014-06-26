@@ -26,7 +26,7 @@ current_connections	value:GAUGE:0:U
 current_sessions	value:GAUGE:0:U
 current			value:GAUGE:U:U
 delay			value:GAUGE:-1000000:1000000
-derive			value:DERIVE:0:U
+derive			value:DERIVE:U:U
 df_complex		value:GAUGE:0:U
 df_inodes		value:GAUGE:0:U
 df			used:GAUGE:0:1125899906842623, free:GAUGE:0:1125899906842623
