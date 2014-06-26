@@ -5,14 +5,7 @@ from time import time, sleep
 
 from mist.monitor.model import get_all_machines
 
-from mist.monitor.graphite import SingleGraphiteSeries
-from mist.monitor.graphite import CombinedGraphiteSeries
-from mist.monitor.graphite import NoDataSeries
-from mist.monitor.graphite import CpuUtilSeries
-from mist.monitor.graphite import LoadSeries
-from mist.monitor.graphite import MemSeries
-from mist.monitor.graphite import DiskWriteSeries
-from mist.monitor.graphite import NetTxSeries
+from mist.monitor.graphite import MultiHandler
 
 from mist.monitor.helpers import tdelta_to_str
 
@@ -28,24 +21,13 @@ ch = logging.StreamHandler()
 log.addHandler(ch)
 
 
-METRICS_MAP = {
-    'nodata': NoDataSeries,
-    'cpu': CpuUtilSeries,
-    'load': LoadSeries,
-    'ram': MemSeries,
-    'disk-write': DiskWriteSeries,
-    'disk': DiskWriteSeries,  # to gracefully handle old rules (TODO:investigate)
-    'network-tx': NetTxSeries,
-}
-
-
-def gt(series, threshold):
-    value = min([value for timestamp, value in series])
+def gt(datapoints, threshold):
+    value = min([value for value, timestamp in datapoints])
     return value > threshold, value
 
 
-def lt(series, threshold):
-    value = max([value for timestamp, value in series])
+def lt(datapoints, threshold):
+    value = max([value for value, timestamp in datapoints])
     return value < threshold, value
 
 
@@ -98,11 +80,11 @@ def notify_core(condition, value):
     return True
 
 
-def check_condition(condition, series):
+def check_condition(condition, datapoints):
 
     # extract value from series and apply operator
     operator = OPERATORS_MAP[condition.operator]
-    triggered, value = operator(series, condition.value)
+    triggered, value = operator(datapoints, condition.value)
 
     # condition state changed
     if triggered != condition.state:
@@ -159,12 +141,23 @@ def check_machine(machine, rule_id=''):
 
     log.info("Checking machine '%s':", machine.uuid)
 
+    old_targets = {
+        'cpu': 'cpu.total.nonidle',
+        'load': 'load.shortterm',
+        'ram': 'memory.nonfree_percent',
+        'disk-read': 'disk.total.disk_octets.read',
+        'disk-write': 'disk.total.disk_octets.write',
+        'network-rx': 'interface.total.if_octets.rx',
+        'network-tx': 'interface.total.if_octets.tx',
+    }
+
+    handler = MultiHandler(machine.uuid)
+
     # check if machine activated
     if not machine.activated:
         log.info("  * Machine is not yet activated (inactive for %s).",
-                 tdelta_to_str(time()-machine.enabled_time))
-        nodata_series = NoDataSeries(machine.uuid)
-        if nodata_series.check_head(bucky=config.ALERTS_BUCKY):
+                 tdelta_to_str(time() - machine.enabled_time))
+        if handler.check_head():
             log.info("  * Machine just got activated!")
             with machine.lock_n_load():
                 machine.activated = True
@@ -176,7 +169,7 @@ def check_machine(machine, rule_id=''):
         return
 
     # gather all conditions
-    conditions = []
+    conditions = {}
     rules = [rule_id] if rule_id else machine.rules
     for rule_id in rules:
         try:
@@ -185,10 +178,9 @@ def check_machine(machine, rule_id=''):
             log.warning("  * rule '%s':Condition not found, probably rule just"
                         " got updated. Will check on next run.", rule_id)
             continue
-        if condition.metric not in METRICS_MAP:
-            log.error("  * rule '%s' (%s):Unknown metric '%s'.",
-                      rule_id, condition, condition.metric)
-            continue
+        target = old_targets.get(condition.metric, condition.metric)
+        ## if "%(head)s." not in target:
+            ## target = "%(head)s." + target
         if condition.operator not in OPERATORS_MAP:
             log.error("  * rule '%s' (%s):Unknown operator '%s'.",
                       rule_id, condition, condition.operator)
@@ -196,72 +188,41 @@ def check_machine(machine, rule_id=''):
         if condition.active_after > time():
             log.info("  * rule '%s' (%s):Not yet active.", rule_id, condition)
             continue
-        conditions.append(condition)
+        conditions[target] = condition
     if not conditions:
+        log.warning("  * no rules found")
         return
 
-    # combine all conditions to perform only one graphite query per machine
-    conditions_series = {
-        condition.cond_id: METRICS_MAP[condition.metric](machine.uuid)
-        for condition in conditions
-    }
-    combined_series = CombinedGraphiteSeries(machine.uuid,
-                                             conditions_series.values())
-
-    for since in ("-70sec", "-100sec"):
-        try:
-            data = combined_series.get_series(since, bucky=config.ALERTS_BUCKY)
-        except GraphiteError as exc:
-            log.warning("%r", exc)
-            return
-
-        # find out actual number of measurements
-        # to account for small clock skew
-        #max_length = max((len(series) for series in data.values()))
-        metrics_num = len(data)
-        if 'nodata' in data:
-            metrics_num -= 1
-        if metrics_num:
-            try:
-                min_length = min((len(series) for alias, series in data.items()
-                                  if alias != 'nodata' and len(series)))
-            except ValueError:
-                min_length = 0
-            measurements = min_length
-            if measurements >= 3:
-                break
-        else:
-            # only nodata alert
-            break
-        log.warning("  * '%s' didn't bring enough values, "
-                    "maybe machine down or time skew", since)
-        # if we got less than 3 measurements, retry with larger 'since' param
+    try:
+        data = handler.get_data(conditions.keys(), start='-90sec')
+    except GraphiteError as exc:
+        log.warning("%r", exc)
+        return
 
     # check all conditions
-    for condition in conditions:
-        alias = conditions_series[condition.cond_id].alias
-        condition_series = data[alias]
-        if alias == 'nodata':
-            nodata_values = [value for timestamp, value in data['nodata']]
-            measurements = len(nodata_values) - sum(nodata_values)
-            if measurements > 0 and measurements < 3:
-                # don't change nodata rule's state when we only received
-                # one or two measurements to avoid continuous state
-                # switching due to time skew on the monitored machine
-                log.warning("  * rule '%s' (%s):Only got %d non-nulls, "
-                            "entering dangerous zone, skipping.",
-                            condition.rule_id, condition, measurements)
-                continue
-        else:
-            if not condition_series:
-                log.warning("  * rule '%s' (%s):No data for rule.",
+    for item in data:
+        target = item['_requested_target']
+        if target not in conditions:
+            log.warning("get data returned unexpected target %s", target)
+            continue
+        condition = conditions.pop(target)
+        datapoints = [(val, ts) for val, ts in item['datapoints']
+                      if val is not None]
+        if not datapoints:
+            log.warning("  * rule '%s' (%s):No data for rule.",
+                        condition.rule_id, condition)
+            continue
+        check_condition(condition, datapoints)
+
+    if conditions:
+        for target, condition in conditions.items():
+            if target == "nodata":
+                # if nodata rule didn't return any datapoints, the whisper
+                # files must be missing, so make the rule true
+                check_condition(condition, [(1, 0)])
+            else:
+                log.warning("  * rule '%s' (%s):Metric not found for rule.",
                             condition.rule_id, condition)
-                continue
-            elif len(condition_series) < 3:
-                log.warning("  * rule '%s' (%s):Not enough data(%d) for rule.",
-                            condition.rule_id, condition, len(condition_series))
-                continue
-        check_condition(condition, condition_series)
 
 
 def main():
@@ -280,7 +241,6 @@ def main():
             log.warning("%s Will not sleep because ALERT_PERIOD=%d",
                         run_msg, config.ALERT_PERIOD)
         log.info("=" * 79)
-
 
 
 if __name__ == "__main__":

@@ -4,6 +4,15 @@ import logging
 from subprocess import call
 from time import time
 
+log = logging.getLogger(__name__)
+
+try:
+    import fcntl
+    CAN_LOCK = True
+except ImportError:
+    log.error("Can't import fcntl module, won't lock collectd.passwd")
+    CAN_LOCK = False
+
 from mist.monitor import config
 from mist.monitor import graphite
 
@@ -21,44 +30,19 @@ from mist.monitor.exceptions import MachineExistsError
 from mist.monitor.exceptions import BadRequestError
 
 
-log = logging.getLogger(__name__)
-
-
 def update_collectd_conf():
     """Update collectd.passwd and collectd.conf.local file.
 
     Reconstructs collectd.passwd adding a uuid/password entry for every machine.
-    Reconstructs collectd.conf.local adding an Import statement for every
-    machine.
-    Sends a SIGHUP to collectd to load fresh configuration.
 
     """
 
     lines = ["%s: %s\n" % (machine.uuid, machine.collectd_password)
              for machine in get_all_machines()]
     with open(os.getcwd() + "/conf/collectd.passwd", "w") as f:
+        if CAN_LOCK:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
         f.writelines(lines)
-
-    import_lines = []
-    passwd_lines = []
-    for machine in get_all_machines():
-        rule_filepath = os.getcwd() + "/conf/collectd_%s.conf" % machine.uuid
-        import_lines.append('Include "%s"\n' % rule_filepath)
-        passwd_lines.append("%s: %s\n" % (machine.uuid,
-                                          machine.collectd_password))
-
-    passwd_filepath = os.getcwd() + "/conf/collectd.passwd"
-    with open(passwd_filepath + ".tmp", "w") as f:
-        f.writelines(passwd_lines)
-    os.rename(passwd_filepath + ".tmp", passwd_filepath)
-
-    imports_filepath = os.getcwd() + "/conf/collectd.conf.local"
-    with open(imports_filepath + ".tmp", "w") as f:
-        f.writelines(import_lines)
-    os.rename(imports_filepath + ".tmp", imports_filepath)
-
-    # send a SIGHUP to collectd to reload configuration."""
-    call(['/usr/bin/pkill', '-HUP', 'collectd'])
 
 
 def add_machine(uuid, password, update_collectd=True):
@@ -83,24 +67,7 @@ def add_machine(uuid, password, update_collectd=True):
         machine.enabled_time = time()
         machine.create()
 
-    # Create new collectd conf to make collectd only accept data for a certain
-    # machine from requests coming from the machine with the right uuid.
-    chain_rule = """PreCacheChain "%(uuid)sRule"
-    <Chain "%(uuid)sRule">
-        <Rule "rule">
-            <Match "regex">
-                Host "^%(uuid)s$"
-            </Match>
-            Target return
-        </Rule>
-        Target continue
-    </Chain>
-    """ % {'uuid': uuid}
-    rule_filepath = os.getcwd() + "/conf/collectd_%s.conf" % machine.uuid
-    with open(rule_filepath, "w") as f:
-        f.write(chain_rule)
-
-    # add uuid/passwd in collectd conf and import chain rule
+    # add uuid/passwd in collectd.passwd
     if update_collectd:
         update_collectd_conf()
 
@@ -126,10 +93,7 @@ def remove_machine(uuid):
 
     machine.delete()
 
-    # Remove chain rule file.
-    os.remove(os.getcwd() + "/conf/collectd_%s.conf" % machine.uuid)
-
-    # reconstruct collectd passwords file to remove uuid/passwd and import
+    # reconstruct collectd passwords file to remove uuid/passwd
     update_collectd_conf()
 
 
@@ -154,9 +118,12 @@ def add_rule(uuid, rule_id, metric, operator, value, reminder_list=None,
     # being triggered in seconds). If not provided, default will be used.
     if reminder_list:
         condition.reminder_list = reminder_list
-    # we set not level to 1 so that new rules that are not satisfied
+    # we set notification level to 1 so that new rules that are not satisfied
     # don't send an OK to core immediately after creation
     condition.notification_level = 1
+
+    # TODO: verify target is valid
+
     condition.create()
 
     with machine.lock_n_load():
@@ -194,73 +161,32 @@ def remove_rule(uuid, rule_id):
 
 
 def get_stats(uuid, metrics, start="", stop="", interval_str=""):
-    allowed_targets = {
-        'cpu': graphite.CpuAllSeries,
-        'load': graphite.LoadSeries,
-        'memory': graphite.MemSeries,
-        'disk': graphite.DiskAllSeries,
-        'network': graphite.NetAllSeries,
+
+    old_targets = {
+        'cpu': 'cpu.total.nonidle',
+        'load': 'load.shorterm',
+        'ram': 'memory.nonfree_percent',
+        'disk-read': 'disk.total.disk_octets.read',
+        'disk-write': 'disk.total.disk_octets.write',
+        'network-rx': 'interface.total.if_octets.rx',
+        'network-tx': 'interface.total.if_octets.tx',
     }
-    series_list = []
-    for metric in metrics:
-        if metric not in allowed_targets:
-            raise BadRequestError("metric '%s' not allowed" % metric)
-        series_list.append(allowed_targets[metric](uuid))
-    series = graphite.CombinedGraphiteSeries(uuid, series_list=series_list)
-    return series.get_series(start, stop, interval_str=interval_str,
-                             transform_null=False, bucky=config.GRAPHS_BUCKY)
+    targets = [old_targets.get(metric, metric) for metric in metrics]
+    handler = graphite.MultiHandler(uuid)
+    data = handler.get_data(targets, start, stop, interval_str=interval_str)
+    for item in data:
+        if item['alias'].rfind("%(head)s.") == 0:
+            item['alias'] = item['alias'][9:]
+    return data
 
 
-def get_cross_graphs(uuid, metric, start="", stop="", interval_str="", diff=False):
-    """Create graphs to cross-check original collectd's data with bucky's."""
-
-    from mist.monitor.exceptions import GraphiteError
-
-    import requests
-
-    allowed_targets = {
-        'cpu': graphite.CpuUtilSeries,
-        'load': graphite.LoadSeries,
-        'memory': graphite.MemSeries,
-        'disk-read': graphite.DiskReadSeries,
-        'disk-write': graphite.DiskWriteSeries,
-        'net-rx': graphite.NetRxSeries,
-        'net-tx': graphite.NetTxSeries,
-    }
-    if metric not in allowed_targets:
-        raise BadRequestError("Unknown metric '%s'" % metric)
-    series = allowed_targets[metric](uuid)
-    alias = series.alias
-    targets = []
-    if diff:
-        targets.append(series.get_inner_target_bucky())
-        targets.append(series.get_inner_target())
-        targets = ["alias(diffSeries(%s,%s),'bucky-collectd.%s')" % (targets[0], targets[1], alias)]
-    else:
-        series.alias = "collectd.%s" % alias
-        targets += series.get_targets(interval_str=interval_str)
-        series.alias = "bucky.%s" % alias
-        targets += series.get_targets(interval_str=interval_str, bucky=True)
-    targets_str = "&".join(["target=%s" % target for target in targets])
-
-    items = [('target', target) for target in targets]
-    items.append(('width', 586))
-    items.append(('height', 308))
-    if start:
-        items.append(('from', start))
-    if stop:
-        items.append(('until', stop))
-    params_str = "&".join(["%s=%s" % (item[0], item[1]) for item in items])
-    uri = "%s/render?%s" % (config.GRAPHITE_URI, params_str)
-    log.info("cross graphs uri: %s", uri)
-    ## headers = {'Content-type': 'image/png', 'Accept': '*/*'}
-    try:
-        resp = requests.get(uri)
-    except Exception as exc:
-        raise GraphiteError(repr(exc))
-    if not resp.ok:
-        raise Exception("Error response from graphite: %s" % resp.text)
-    return resp.content
+def find_metrics(uuid):
+    handler = graphite.MultiHandler(uuid)
+    metrics = handler.find_metrics()
+    for item in metrics:
+        if item['alias'].rfind("%(head)s.") == 0:
+            item['alias'] = item['alias'][9:]
+    return metrics
 
 
 def reset_hard(data):
