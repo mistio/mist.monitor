@@ -30,8 +30,9 @@ class Condition(OODictMongoMemcache):
     rule_id = StrField()
 
     metric = StrField()
-    operator = StrField()
-    value = FloatField()
+    operator = StrField()  # must be in ('gt', 'lt')
+    aggregate = StrField()  # must be in ('all', 'any', 'avg')
+    value = FloatField()  # threshold
     reminder_list = make_field(_IntList)()  # in seconds
     active_after = FloatField()  # timestamp
 

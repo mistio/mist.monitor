@@ -97,10 +97,14 @@ def remove_machine(uuid):
     update_collectd_conf()
 
 
-def add_rule(uuid, rule_id, metric, operator, value, reminder_list=None,
+def add_rule(uuid, rule_id, metric, operator, value,
+             aggregate="all", reminder_list=None,
              active_after=30):
     """Add or update a rule."""
 
+    if aggregate not in ('all', 'any', 'avg'):
+        raise BadRequestError("Param 'aggregate' must be in "
+                              "('all', 'any', 'avg').")
     machine = get_machine_from_uuid(uuid)
     if not machine:
         raise MachineNotFoundError(uuid)
@@ -113,6 +117,7 @@ def add_rule(uuid, rule_id, metric, operator, value, reminder_list=None,
     condition.active_after = time() + active_after
     condition.metric = metric
     condition.operator = operator
+    condition.aggregate = aggregate
     condition.value = value
     # reminder_list should be a list of integers (notifications after rule
     # being triggered in seconds). If not provided, default will be used.
