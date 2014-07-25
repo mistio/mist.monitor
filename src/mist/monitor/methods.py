@@ -228,7 +228,9 @@ def reset_hard(data):
                 metric=rule_dict['metric'],
                 operator=rule_dict['operator'],
                 value=rule_dict['value'],
+                aggregate=rule_dict.get('aggregate'),
                 reminder_list=rule_dict.get('reminder_list'),
+                reminder_offset=rule_dict.get('reminder_offset', 0),
             )
 
     # update collectd's conf and reload it
