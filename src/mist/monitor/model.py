@@ -78,7 +78,10 @@ class Condition(OODictMongoMemcache):
             operator = "greater than"
         else:
             operator = "?"
-        return "%s %s %s" % (self.metric, operator, self.value)
+        return "%s of %s %s %s for 60 + %d secs" % (
+            self.aggregate, self.metric, operator, self.value,
+            self.reminder_offset
+        )
 
 
 def get_condition_from_cond_id(cond_id):
