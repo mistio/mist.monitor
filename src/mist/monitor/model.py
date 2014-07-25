@@ -34,6 +34,7 @@ class Condition(OODictMongoMemcache):
     aggregate = StrField()  # must be in ('all', 'any', 'avg')
     value = FloatField()  # threshold
     reminder_list = make_field(_IntList)()  # in seconds
+    reminder_offset = IntField()  # seconds to add to items of reminder_list
     active_after = FloatField()  # timestamp
 
     state = BoolField()

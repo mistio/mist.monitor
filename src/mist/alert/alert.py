@@ -124,6 +124,7 @@ def check_condition(condition, datapoints):
     if condition.state and len(reminder_list) > condition.notification_level:
         duration = time() - condition.state_since
         next_notification = reminder_list[condition.notification_level]
+        next_notification += condition.reminder_offset
         if duration >= next_notification:
             log.info("    * sending WARNING to core")
             if not notify_core(condition, value):

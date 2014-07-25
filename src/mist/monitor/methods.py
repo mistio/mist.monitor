@@ -98,7 +98,7 @@ def remove_machine(uuid):
 
 
 def add_rule(uuid, rule_id, metric, operator, value,
-             aggregate="all", reminder_list=None,
+             aggregate="all", reminder_list=None, reminder_offset=0,
              active_after=30):
     """Add or update a rule."""
 
@@ -123,6 +123,7 @@ def add_rule(uuid, rule_id, metric, operator, value,
     # being triggered in seconds). If not provided, default will be used.
     if reminder_list:
         condition.reminder_list = reminder_list
+    condition.reminder_offset = reminder_offset
     # we set notification level to 1 so that new rules that are not satisfied
     # don't send an OK to core immediately after creation
     condition.notification_level = 1
