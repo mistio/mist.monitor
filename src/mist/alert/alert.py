@@ -21,20 +21,26 @@ ch = logging.StreamHandler()
 log.addHandler(ch)
 
 
-def gt(datapoints, threshold):
-    value = min([value for value, timestamp in datapoints])
-    return value > threshold, value
-
-
-def lt(datapoints, threshold):
-    value = max([value for value, timestamp in datapoints])
-    return value < threshold, value
-
-
-OPERATORS_MAP = {
-    'gt': gt,
-    'lt': lt,
-}
+def compute(operator, aggregate, values, threshold):
+    if aggregate == 'avg':
+        # apply avg before operator
+        values = [float(sum(values)) / len(values)]
+    if operator == 'gt':
+        states = {value: value > threshold for value in values}
+    elif operator == 'lt':
+        states = {value: value < threshold for value in values}
+    if aggregate == 'all':
+        state = False not in states.values()
+        if not state:
+            # find retval from false values
+            values = [value for value, _state in states.items() if not _state]
+    else:
+        state = True in states.values()
+    if operator == 'gt':
+        retval = max(values)
+    elif operator == 'lt':
+        retval = min(values)
+    return state, retval
 
 
 def notify_core(condition, value):
@@ -83,8 +89,10 @@ def notify_core(condition, value):
 def check_condition(condition, datapoints):
 
     # extract value from series and apply operator
-    operator = OPERATORS_MAP[condition.operator]
-    triggered, value = operator(datapoints, condition.value)
+    triggered, value = compute(condition.operator,
+                               condition.aggregate,
+                               [val for val, timestamp in datapoints],
+                               condition.value)
 
     # condition state changed
     if triggered != condition.state:
@@ -116,6 +124,7 @@ def check_condition(condition, datapoints):
     if condition.state and len(reminder_list) > condition.notification_level:
         duration = time() - condition.state_since
         next_notification = reminder_list[condition.notification_level]
+        next_notification += condition.reminder_offset
         if duration >= next_notification:
             log.info("    * sending WARNING to core")
             if not notify_core(condition, value):
@@ -181,9 +190,18 @@ def check_machine(machine, rule_id=''):
         target = old_targets.get(condition.metric, condition.metric)
         ## if "%(head)s." not in target:
             ## target = "%(head)s." + target
-        if condition.operator not in OPERATORS_MAP:
+        if condition.operator not in ('gt', 'lt'):
             log.error("  * rule '%s' (%s):Unknown operator '%s'.",
                       rule_id, condition, condition.operator)
+            continue
+        if not condition.aggregate:
+            log.warning("  * rule '%s' (%s):Setting aggregate to 'all'.",
+                        rule_id, condition)
+            condition.aggregate = 'all'
+            condition.save()
+        if condition.aggregate not in ('all', 'any', 'avg'):
+            log.error("  * rule '%s' (%s):Unknown aggregate '%s'.",
+                      rule_id, condition, condition.aggregate)
             continue
         if condition.active_after > time():
             log.info("  * rule '%s' (%s):Not yet active.", rule_id, condition)

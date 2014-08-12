@@ -103,8 +103,12 @@ def add_rule(request):
     operator = params["operator"]
     value = params["value"]
     reminder_list = params.get("reminder_list")
+    reminder_offset = params.get("reminder_offset")
+    aggregate = params.get("aggregate")
 
-    methods.add_rule(uuid, rule_id, metric, operator, value, reminder_list)
+    methods.add_rule(uuid, rule_id, metric, operator, value,
+                     aggregate=aggregate, reminder_list=reminder_list,
+                     reminder_offset=reminder_offset)
     return OK
 
 @view_config(route_name='rule', request_method='DELETE')

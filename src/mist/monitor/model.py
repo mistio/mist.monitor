@@ -30,9 +30,11 @@ class Condition(OODictMongoMemcache):
     rule_id = StrField()
 
     metric = StrField()
-    operator = StrField()
-    value = FloatField()
+    operator = StrField()  # must be in ('gt', 'lt')
+    aggregate = StrField()  # must be in ('all', 'any', 'avg')
+    value = FloatField()  # threshold
     reminder_list = make_field(_IntList)()  # in seconds
+    reminder_offset = IntField()  # seconds to add to items of reminder_list
     active_after = FloatField()  # timestamp
 
     state = BoolField()
@@ -76,7 +78,10 @@ class Condition(OODictMongoMemcache):
             operator = "greater than"
         else:
             operator = "?"
-        return "%s %s %s" % (self.metric, operator, self.value)
+        return "%s of %s %s %s for 60 + %d secs" % (
+            self.aggregate, self.metric, operator, self.value,
+            self.reminder_offset
+        )
 
 
 def get_condition_from_cond_id(cond_id):
