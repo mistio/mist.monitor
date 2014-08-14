@@ -625,9 +625,6 @@ class MultiHandler(GenericHandler):
                             break
         return data
 
-    def decorate_target(self, target):
-        return self.get_handler(target).decorate_target(target)
-
 
 class NoDataHandler(MultiHandler, CustomHandler):
     plugin = "nodata"
@@ -640,15 +637,15 @@ class NoDataHandler(MultiHandler, CustomHandler):
                   self.__class__.__name__, target)
 
     def decorate_target(self, target):
-        return {
-            'target': "%(head)s.nodata",
-            'alias': "%(head)s.nodata",
-            'name': "No Data",
-            'unit': "boolean",
-            'max_value': 1,
-            'min_value': 0,
-            'priority': 0,
-        }
+        metric = super(NoDataHandler, self).decorate_target(target)
+        parts = self.parse_target(metric['alias'])
+        if parts is not None:
+            metric['name'] = "No Data"
+            metric['unit'] = "boolean"
+            metric['min_value'] = 0
+            metric['max_value'] = 1
+            metric['priority'] = 0
+        return metric
 
     def find_metrics(self, plugin=""):
         return [self.decorate_target("%(head)s.nodata")]

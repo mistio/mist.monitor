@@ -9,7 +9,6 @@ import multiprocessing
 from bucky.names import statname
 
 from mist.monitor import config as mon_config
-from mist.monitor.graphite import MultiHandler
 from mist.monitor.model import get_machine_from_uuid
 
 
@@ -104,18 +103,15 @@ class NewMetricsDispatcher(threading.Thread):
         if not machine:
             log.error("machine not found, wtf!")
             return
-        multihandler = MultiHandler(host)
-        metrics = []
+        metrics = set()
         for name in names:
-            target = statname(host, name)
-            metric = multihandler.decorate_target(target)
-            if metric['alias'].rfind("%(head)s.") == 0:
-                metric['alias'] = metric['alias'][9:]
-            plugin = metric['alias'].split('.')[0]
+            metric = statname(host, name).replace("bucky.%s." % host, "")
+            plugin = metric.split(".")[0]
             if plugin not in self.ignore_plugins:
-                metrics.append(metric)
+                metrics.add(metric)
         if not metrics:
             return
+        metrics = list(metrics)
         log.info("New metrics for host %s, notifying core: %s", host, metrics)
         payload = {
             'uuid': host,
