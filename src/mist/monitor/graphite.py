@@ -625,6 +625,9 @@ class MultiHandler(GenericHandler):
                             break
         return data
 
+    def decorate_target(self, target):
+        return self.get_handler(target).decorate_target(target)
+
 
 class NoDataHandler(MultiHandler, CustomHandler):
     plugin = "nodata"
