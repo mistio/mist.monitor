@@ -1,6 +1,9 @@
 import sys
+import time
+import datetime
 
 from bucky.client import Client
+from bucky.names import statname
 
 
 class DebugClient(Client):
@@ -13,13 +16,18 @@ class DebugClient(Client):
         else:
             self.stdout = sys.stdout
 
-    def send(self, host, name, value, time):
-        if self.filter(host, name, value, time):
-            self.write(host, name, value, time)
+    def send(self, host, name, value, tstamp):
+        if self.filter(host, name, value, tstamp):
+            self.write(host, name, value, tstamp)
 
-    def filter(self, host, name, value, time):
+    def filter(self, host, name, value, tstamp):
         return True
 
-    def write(self, host, name, value, time):
-        self.stdout.write('%s %s %s %s\n' % (host, name, value, time))
+    def write(self, host, name, value, tstamp):
+        target = statname(host, name)
+        dtime = datetime.datetime.fromtimestamp(tstamp)
+        time_lbl = dtime.strftime('%y%m%d %H:%M:%S')
+        self.stdout.write('%s (%.1fs) %s %r\n' % (time_lbl,
+                                                  tstamp - time.time(),
+                                                  target, value))
         self.stdout.flush()
