@@ -99,3 +99,17 @@ processor = gen_composite_processor(
     TimeConverterSingleThread(13),
     NewMetricsObserver(path='conf/discovered_metrics.conf'),
 )
+
+
+#from mist.bucky_extras.clients.debug_client import DebugClient
+#from bucky.names import statname
+#
+#class MyDebugClient(DebugClient):
+#    out_path = None
+#    # override 'filter' (and optionally 'write') methods
+#    def filter(self, host, name, value, time):
+#        # target = statname(host, name)
+#        return True
+#
+#custom_clients = [MyDebugClient]
+
