@@ -17,6 +17,8 @@ statsd_enabled = False
 collectd_ip = "0.0.0.0"
 collectd_port = 25826
 collectd_enabled = True
+collectd_counter_eq_derive = True
+collectd_workers = 4
 
 collectd_auth_file = "/home/mist/mist.monitor/conf/collectd.passwd"
 collectd_security_level = 2  # 0: None, 1: Sign, 2: Encrypt
