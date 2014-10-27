@@ -596,8 +596,13 @@ class MultiHandler(GenericHandler):
         for handler, targets in current_handlers.items():
             max_targets = 5
             while targets:
-                data += handler.get_data(targets[:max_targets], start=start,
-                                         stop=stop, interval_str=interval_str)
+                try:
+                    data += handler.get_data(targets[:max_targets],
+                                             start=start, stop=stop,
+                                             interval_str=interval_str)
+                except Exception as exc:
+                    log.warning("Multihandler got response: %r", exc)
+                    pass
                 targets = targets[max_targets:]
 
         # align start/stop
