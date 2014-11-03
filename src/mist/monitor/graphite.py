@@ -1,4 +1,5 @@
 import re
+import time
 import logging
 import requests
 import HTMLParser
@@ -593,6 +594,7 @@ class MultiHandler(GenericHandler):
                 current_handlers[handler] = []
             current_handlers[handler].append(target)
         data = []
+        started_at = time.time()
         for handler, targets in current_handlers.items():
             max_targets = 5
             while targets:
@@ -604,6 +606,8 @@ class MultiHandler(GenericHandler):
                     log.warning("Multihandler got response: %r", exc)
                     pass
                 targets = targets[max_targets:]
+        log.info("Multihandler get_data completed in: %.2f secs",
+                 time.time() - started_at)
 
         # align start/stop
         starts = set()
