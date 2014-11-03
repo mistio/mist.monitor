@@ -612,8 +612,10 @@ class MultiHandler(GenericHandler):
                 log.warning("Multihandler got response: %r", exc)
                 return []
 
-        parts = ThreadPool(10).map(_run, run_args)
+        pool = ThreadPool(10)
+        parts = pool.map(_run, run_args)
         data = reduce(lambda x, y: x + y, parts)
+        pool.terminate()
         log.info("Multihandler get_data completed in: %.2f secs",
                  time.time() - started_at)
 
