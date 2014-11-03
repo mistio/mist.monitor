@@ -5,6 +5,9 @@ import requests
 import HTMLParser
 
 
+from multiprocessing.pool import ThreadPool
+
+
 from mist.monitor import config
 from mist.monitor.exceptions import GraphiteError
 
@@ -593,19 +596,24 @@ class MultiHandler(GenericHandler):
             if handler not in current_handlers:
                 current_handlers[handler] = []
             current_handlers[handler].append(target)
-        data = []
+        max_targets = 5  # max targets per http request
         started_at = time.time()
+        run_args = []
         for handler, targets in current_handlers.items():
-            max_targets = 5
             while targets:
-                try:
-                    data += handler.get_data(targets[:max_targets],
-                                             start=start, stop=stop,
-                                             interval_str=interval_str)
-                except Exception as exc:
-                    log.warning("Multihandler got response: %r", exc)
-                    pass
+                run_args.append((handler.get_data, targets[:max_targets]))
                 targets = targets[max_targets:]
+
+        def _run((func, targets)):
+            try:
+                return func(targets, start=start, stop=stop,
+                            interval_str=interval_str)
+            except Exception as exc:
+                log.warning("Multihandler got response: %r", exc)
+                return []
+
+        parts = ThreadPool(10).map(_run, run_args)
+        data = reduce(lambda x, y: x + y, parts)
         log.info("Multihandler get_data completed in: %.2f secs",
                  time.time() - started_at)
 
