@@ -23,6 +23,9 @@ collectd_workers = 4
 collectd_auth_file = "/home/mist/mist.monitor/conf/collectd.passwd"
 collectd_security_level = 2  # 0: None, 1: Sign, 2: Encrypt
 
+from mist.bucky_extras.dpi import PacketReporter
+collectd_dpi_report_packet = PacketReporter(60, repeat=2)
+
 # A list of file names for collectd types.db
 # files.
 collectd_types = ["conf/types.db"]
