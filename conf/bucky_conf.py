@@ -115,3 +115,10 @@ processor = gen_composite_processor(
 #
 #custom_clients = [MyDebugClient]
 
+
+from mist.bucky_extras.clients.count import CountClient
+
+CountClient.repeat = 2
+#CountClient.interval = 10
+
+custom_clients = [CountClient]
