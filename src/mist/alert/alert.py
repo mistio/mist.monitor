@@ -206,7 +206,10 @@ def check_machine(machine, rule_id=''):
         if condition.active_after > time():
             log.info("  * rule '%s' (%s):Not yet active.", rule_id, condition)
             continue
-        conditions[target] = condition
+        if target not in conditions:
+            conditions[target] = [condition]
+        else:
+            conditions[target].append(condition)
     if not conditions:
         log.warning("  * no rules found")
         return
@@ -223,14 +226,14 @@ def check_machine(machine, rule_id=''):
         if target not in conditions:
             log.warning("get data returned unexpected target %s", target)
             continue
-        condition = conditions.pop(target)
         datapoints = [(val, ts) for val, ts in item['datapoints']
                       if val is not None]
-        if not datapoints:
-            log.warning("  * rule '%s' (%s):No data for rule.",
-                        condition.rule_id, condition)
-            continue
-        check_condition(condition, datapoints)
+        for condition in conditions.pop(target):
+            if not datapoints:
+                log.warning("  * rule '%s' (%s):No data for rule.",
+                            condition.rule_id, condition)
+                continue
+            check_condition(condition, datapoints)
 
     if conditions:
         for target, condition in conditions.items():
