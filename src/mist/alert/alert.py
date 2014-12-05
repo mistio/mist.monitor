@@ -264,12 +264,12 @@ def main():
         run_msg = "Run completed in %.1f seconds." % dt
         sleep_time = config.ALERT_PERIOD - dt
         if sleep_time > 0:
-            log.info("%s Sleeping for %.1f seconds.", run_msg, sleep_time)
+            log.info("%s Sleeping for %.1f seconds. ==========",
+                     run_msg, sleep_time)
             sleep(sleep_time)
         else:
-            log.warning("%s Will not sleep because ALERT_PERIOD=%d",
+            log.warning("%s Will not sleep because ALERT_PERIOD=%d ==========",
                         run_msg, config.ALERT_PERIOD)
-        log.info("=" * 79)
 
 
 if __name__ == "__main__":
