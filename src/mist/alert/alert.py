@@ -19,6 +19,8 @@ from mist.monitor import config
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 ch = logging.StreamHandler()
+logfmt = '[%(asctime)-15s][%(levelname)s] %(module)s - %(message)s'
+ch.setFormatter(logging.Formatter(logfmt))
 log.addHandler(ch)
 
 
