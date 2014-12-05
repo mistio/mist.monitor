@@ -52,6 +52,7 @@ REMINDER_LIST = settings.get(
 # mist.alert periodically checks if the rules are triggered. This option
 # defines mist.alert's period between two consecutive runs (in seconds).
 ALERT_PERIOD = settings.get("ALERT_PERIOD", 15)
+ALERT_THREADS = settings.get("ALERT_THREADS", 32)
 
 
 # Graphite's storage interval, needed because derivative metrics always return

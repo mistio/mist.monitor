@@ -1,6 +1,7 @@
 import logging
 import requests
 from time import time, sleep
+from multiprocessing.pool import ThreadPool
 
 
 from mist.monitor.model import get_all_machines
@@ -247,10 +248,10 @@ def check_machine(machine, rule_id=''):
 
 
 def main():
+    pool = ThreadPool(config.ALERT_THREADS)
     while True:
         t0 = time()
-        for machine in get_all_machines():
-            check_machine(machine)
+        pool.map(check_machine, get_all_machines())
         t1 = time()
         dt = t1 - t0
         run_msg = "Run completed in %.1f seconds." % dt
