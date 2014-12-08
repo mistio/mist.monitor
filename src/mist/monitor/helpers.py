@@ -16,18 +16,16 @@ def tdelta_to_str(secs):
     if not secs:
         return ""
     mins, secs = divmod(secs, 60)
-    parts.append((secs, 'sec'))
+    parts.append((secs, 's'))
     if mins:
         hours, mins = divmod(mins, 60)
-        parts.append((mins, 'min'))
+        parts.append((mins, 'm'))
         if hours:
             days, hours = divmod(hours, 24)
-            parts.append((hours, 'hour'))
+            parts.append((hours, 'h'))
             if days:
-                parts.append((days, 'day'))
+                parts.append((days, 'd'))
     texts = []
     for num, label in reversed(parts):
-        if num > 1:
-            label += 's'
-        texts.append("%d %s" % (num, label))
-    return ", ".join(texts)
+        texts.append("%d%s" % (num, label))
+    return "".join(texts)

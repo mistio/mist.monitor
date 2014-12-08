@@ -73,12 +73,12 @@ class Condition(OODictMongoMemcache):
     def __str__(self):
         """Return a human readable string representation of this condition."""
         if self.operator == 'lt':
-            operator = "less than"
+            operator = '<'
         elif self.operator == 'gt':
-            operator = "greater than"
+            operator = '>'
         else:
             operator = "?"
-        return "%s of %s %s %s for 60 + %d secs" % (
+        return "%s(%s)%s%s for 60+%ds" % (
             self.aggregate, self.metric, operator, self.value,
             self.reminder_offset
         )
