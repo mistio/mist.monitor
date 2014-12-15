@@ -18,7 +18,7 @@ except Exception as exc:
 CORE_URI = settings.get("CORE_URI", "https://mist.io")
 # Almost all servers either run graphite locally or have a local graphite proxy
 GRAPHITE_URI = settings.get("GRAPHITE_URI", "http://localhost")
-MONGO_URI = settings.get("MONGO_URI", "localhost:27022")
+MONGO_URI = settings.get("MONGO_URI", "localhost:27017")
 MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
 
 

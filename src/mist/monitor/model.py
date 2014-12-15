@@ -47,7 +47,7 @@ class Condition(OODictMongoMemcache):
         super(Condition, self).__init__(
             memcache_host=config.MEMCACHED_URI,
             mongo_uri=config.MONGO_URI,
-            mongo_db='mist',
+            mongo_db='mist_monitor',
             mongo_coll='conditions',
             mongo_id='cond_id',
             mongo_client=mongo_client,
@@ -119,7 +119,7 @@ class Machine(OODictMongoMemcacheLock):
         super(Machine, self).__init__(
             memcache_host=config.MEMCACHED_URI,
             mongo_uri=config.MONGO_URI,
-            mongo_db='mist',
+            mongo_db='mist_monitor',
             mongo_coll='machines',
             mongo_id='uuid',
             mongo_client=mongo_client,
@@ -164,5 +164,5 @@ def get_all_machines(mongo_uri=None):
     """Get an iterator over all machine entries"""
     conn = MongoClient(mongo_uri or config.MONGO_URI)
     cache = MemcacheClient(config.MEMCACHED_URI)
-    machines_cursor = conn['mist'].machines.find()
+    machines_cursor = conn['mist_monitor'].machines.find()
     return (Machine(machine_dict, conn, cache) for machine_dict in machines_cursor)

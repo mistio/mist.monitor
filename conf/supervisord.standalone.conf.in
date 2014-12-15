@@ -41,14 +41,6 @@ redirect_stderr = false
 autorestart = true
 user = mist
 
-[program:mongodb]
-command = ${buildout:directory}/bin/mongod  --journal --dbpath ${buildout:directory}/var/data --bind_ip 127.0.0.1 --master --nohttpinterface --logpath ${buildout:directory}/var/log/mongodb.log --directoryperdb
-process_name = mongodb
-directory = ${buildout:directory}/bin
-priority = 30
-redirect_stderr = false
-user = mist
-
 [program:alert]
 command = ${buildout:directory}/bin/mist-alert
 process_name = alert
@@ -56,12 +48,3 @@ directory = ${buildout:directory}
 priority = 40
 redirect_stderr = false
 user = mist
-
-[program:memcache]
-command = ${buildout:directory}/bin/memcached  -l 127.0.0.1
-process_name = memcache
-directory = ${buildout:directory}/bin
-priority = 25
-redirect_stderr = false
-user = mist
-

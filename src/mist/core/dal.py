@@ -353,7 +353,7 @@ class User(OODictMongoMemcacheLock):
         return super(User, self).__init__(
             memcache_host=config.MEMCACHED_HOST,
             mongo_uri=config.MONGO_URI,
-            mongo_db='mist',
+            mongo_db='mist_monitor',
             mongo_coll='users',
             mongo_id='email',
             mongo_client=mongo_client,

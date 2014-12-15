@@ -3,7 +3,7 @@
 #CORE_URI = "https://mist.io"
 # Almost all servers either run graphite locally or have a local graphite proxy
 #GRAPHITE_URI = "http://localhost"
-#MONGO_URI = "localhost:27022"
+#MONGO_URI = "localhost:27017"
 #MEMCACHED_URI = ["localhost:11211"]
 
 # Verify core's SSL certificate when communicating via HTTPS
