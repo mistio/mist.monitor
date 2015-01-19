@@ -35,16 +35,9 @@ REMINDER_LIST = settings.get(
     "REMINDER_LIST",
     [
         0,  # notification level 0 - right away
-        60,  # notification level 1 - 1 min
-        60 * 5,  # notification level 2 - 5 mins
-        60 * 10,  # notification level 3 - 10 mins
-        60 * 30,  # notification level 4 - 30 mins
-        60 * 60,  # notification level 5 - 1 hour
-        60 * 60 * 2,  # notification level 6 - 2 hours
-        60 * 60 * 6,  # notification level 7 - 6 hours
-        60 * 60 * 10,  # notification level 8 - 10 hours
-        60 * 60 * 20,  # notification level 9 - 20 hours
-        60 * 60 * 24,  # notification level 10 - 1 day
+        60 * 10,  # notification level 1 - 10 mins
+        60 * 60,  # notification level 2 - 1 hour
+        60 * 60 * 24,  # notification level 3 - 1 day
     ]
 )
 
