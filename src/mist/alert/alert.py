@@ -244,14 +244,15 @@ def check_machine(machine, rule_id=''):
             check_condition(condition, datapoints)
 
     if conditions:
-        for target, condition in conditions.items():
-            if target == "nodata":
-                # if nodata rule didn't return any datapoints, the whisper
-                # files must be missing, so make the rule true
-                check_condition(condition, [(1, 0)])
-            else:
-                log.warning("%s/%s [%s] target not found for rule",
-                            machine.uuid, condition.rule_id, condition)
+        for target in conditions:
+            for cond in conditions[target]:
+                if target == "nodata":
+                    # if nodata rule didn't return any datapoints, the whisper
+                    # files must be missing, so make the rule true
+                    check_condition(cond, [(1, 0)])
+                else:
+                    log.warning("%s/%s [%s] target not found for rule",
+                                machine.uuid, cond.rule_id, cond)
 
 
 def main():
