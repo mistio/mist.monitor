@@ -1,3 +1,4 @@
+import uuid
 import logging
 import requests
 from time import time, sleep
@@ -76,6 +77,7 @@ def notify_core(condition, value):
         'triggered': int(condition.state),
         'since': int(condition.state_since),
         'notification_level': condition.notification_level,
+        'incident_id': condition.incident_id,
     }
     resp = requests.put(config.CORE_URI + "/rules", params=params,
                         verify=config.SSL_VERIFY)
@@ -104,6 +106,9 @@ def check_condition(condition, datapoints):
             condition.notification_level = 1
         else:
             condition.notification_level = 0
+        if triggered:
+            # if condition just got triggered, issue a new incident_id
+            condition.incident_id = uuid.uuid4().hex
         condition.save()
 
     # logs are gooood
