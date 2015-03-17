@@ -125,6 +125,7 @@ def check_condition(condition, datapoints):
         next_notification = reminder_list[condition.notification_level]
         next_notification += condition.reminder_offset
         if duration < next_notification:
+            log.info(msg)
             return
         try:
             notify_core(condition, value)
@@ -239,7 +240,8 @@ def check_machine(machine, rule_id=''):
                       if val is not None]
         for condition in conditions.pop(target):
             if not datapoints:
-                log.warning("%s no data for rule", machine.uuid)
+                log.warning("%s/%s [%s] no data for rule",
+                            machine.uuid, condition.rule_id, condition)
                 continue
             check_condition(condition, datapoints)
 
