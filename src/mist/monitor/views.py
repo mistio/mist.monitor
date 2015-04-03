@@ -125,11 +125,15 @@ def get_stats(request):
     """Returns all stats for a machine, the client will draw them."""
 
     uuid = request.matchdict['machine']
-    params = request.params
-    metrics = params.getall('metric')
+    try:
+        params = request.json_body
+        metrics = params.get('metrics')
+    except:
+        params = request.params
+        metrics = params.getall('metric')
     start = params.get('start')
     stop = params.get('stop')
-    interval_str = params.get('step')
+    interval_str = str(params.get('step', ''))
 
     if re.match("^[0-9]+(\.[0-9]+)?$", interval_str):
         seconds = int(interval_str)
