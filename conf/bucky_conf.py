@@ -25,7 +25,7 @@ collectd_security_level = 2  # 0: None, 1: Sign, 2: Encrypt
 
 # A list of file names for collectd types.db
 # files.
-collectd_types = ["conf/types.db"]
+collectd_types = ["conf/types.db", "conf/types-perfwatcher.db"]
 
 # A mapping of plugin names to converter callables. These are
 # explained in more detail in the README.
