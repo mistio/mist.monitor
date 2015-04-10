@@ -232,13 +232,19 @@ class LoadHandler(CustomHandler):
         metric = super(LoadHandler, self).decorate_target(target)
         parts = self.parse_target(metric['alias'])
         if parts is not None:
-            period = parts[0]
-            minutes = {'shortterm': 1, 'midterm': 5, 'longterm': 15}
-            if minutes[period] > 1:
-                metric['name'] = "Load (%d mins)" % minutes[period]
+            if parts[0] == 'percent':  # collectm in windows server
+                metric['name'] = "Load (%)"
+                metric['min_value'] = 0
+                metric['max_value'] = 100
             else:
-                metric['name'] = "Load"
-            metric['min_value'] = 0
+                period = parts[0]
+                minutes = {'shortterm': 1, 'midterm': 5, 'longterm': 15}
+                if period in minutes:
+                    if minutes[period] > 1:
+                        metric['name'] = "Load (%d mins)" % minutes[period]
+                    else:
+                        metric['name'] = "Load"
+                metric['min_value'] = 0
             metric['priority'] = 0
         return metric
 
