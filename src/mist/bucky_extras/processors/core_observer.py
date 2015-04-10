@@ -34,7 +34,7 @@ class NewMetricsObserver(object):
                         host, name = parts
                         self.metrics.add((host, name))
                     else:
-                        log.error("Invalid line in '%s': 's'", path, line)
+                        log.error("Invalid line in '%s': '%s'", path, line)
                 log.info("Loaded %d metrics from file", len(self.metrics))
                 f.close()
         else:
