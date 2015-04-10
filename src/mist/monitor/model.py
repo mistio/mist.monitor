@@ -39,6 +39,7 @@ class Condition(OODictMongoMemcache):
 
     state = BoolField()
     state_since = FloatField()
+    incident_id = StrField()
 
     notification_level = IntField()
 

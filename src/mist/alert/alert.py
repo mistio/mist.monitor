@@ -1,3 +1,4 @@
+import uuid
 import logging
 import requests
 from time import time, sleep
@@ -76,6 +77,7 @@ def notify_core(condition, value):
         'triggered': int(condition.state),
         'since': int(condition.state_since),
         'notification_level': condition.notification_level,
+        'incident_id': condition.incident_id,
     }
     resp = requests.put(config.CORE_URI + "/rules", params=params,
                         verify=config.SSL_VERIFY)
@@ -104,6 +106,9 @@ def check_condition(condition, datapoints):
             condition.notification_level = 1
         else:
             condition.notification_level = 0
+        if triggered:
+            # if condition just got triggered, issue a new incident_id
+            condition.incident_id = uuid.uuid4().hex
         condition.save()
 
     # logs are gooood
@@ -125,6 +130,7 @@ def check_condition(condition, datapoints):
         next_notification = reminder_list[condition.notification_level]
         next_notification += condition.reminder_offset
         if duration < next_notification:
+            log.info(msg)
             return
         try:
             notify_core(condition, value)
@@ -239,19 +245,21 @@ def check_machine(machine, rule_id=''):
                       if val is not None]
         for condition in conditions.pop(target):
             if not datapoints:
-                log.warning("%s no data for rule", machine.uuid)
+                log.warning("%s/%s [%s] no data for rule",
+                            machine.uuid, condition.rule_id, condition)
                 continue
             check_condition(condition, datapoints)
 
     if conditions:
-        for target, condition in conditions.items():
-            if target == "nodata":
-                # if nodata rule didn't return any datapoints, the whisper
-                # files must be missing, so make the rule true
-                check_condition(condition, [(1, 0)])
-            else:
-                log.warning("%s/%s [%s] target not found for rule",
-                            machine.uuid, condition.rule_id, condition)
+        for target in conditions:
+            for cond in conditions[target]:
+                if target == "nodata":
+                    # if nodata rule didn't return any datapoints, the whisper
+                    # files must be missing, so make the rule true
+                    check_condition(cond, [(1, 0)])
+                else:
+                    log.warning("%s/%s [%s] target not found for rule",
+                                machine.uuid, cond.rule_id, cond)
 
 
 def main():

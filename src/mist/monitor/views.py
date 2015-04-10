@@ -125,15 +125,32 @@ def get_stats(request):
     """Returns all stats for a machine, the client will draw them."""
 
     uuid = request.matchdict['machine']
-    params = request.params
-    metrics = params.getall('metric')
+    try:
+        params = request.json_body
+        metrics = params.get('metrics')
+    except:
+        params = request.params
+        metrics = params.getall('metric')
     start = params.get('start')
     stop = params.get('stop')
-    interval_str = params.get('step')
+    interval_str = str(params.get('step', ''))
 
     if re.match("^[0-9]+(\.[0-9]+)?$", interval_str):
-        interval_str = int(interval_str)
-        interval_str = "%ssec" % (interval_str)
+        seconds = int(interval_str)
+        log.info('seconds: %d', seconds)
+        log.info('start: %s', start)
+        for key in sorted(config.RETENTIONS.keys()):
+            log.info('testing key, tstamp: %s %s', key, time()-key)
+            log.info('period interval %s', config.RETENTIONS[key])
+            if int(start) >= time() - key:
+                if seconds < config.RETENTIONS[key]:
+                    raise BadRequestError(
+                        "Requested resolution is too high for specified time "
+                        "range, try zooming out."
+                    )
+                log.info('step is ok')
+                break
+        interval_str = "%ssec" % seconds
 
     return methods.get_stats(uuid, metrics, start, stop, interval_str)
 
