@@ -1,0 +1,3 @@
+[submodule "src/bucky"]
+	path = src/bucky
+	url = git@github.com:dimrozakis/bucky
