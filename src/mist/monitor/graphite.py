@@ -12,8 +12,6 @@ from mist.monitor import config
 from mist.monitor.exceptions import GraphiteError
 
 
-REQ_SESSION = None
-
 log = logging.getLogger(__name__)
 
 
@@ -84,26 +82,12 @@ class GenericHandler(object):
         return requests.Request('GET', "%s/render" % config.GRAPHITE_URI,
                                 params=params).prepare().url
 
-    def graphite_request(self, url, use_session=True):
+    def graphite_request(self, url):
         """Issue a request to graphite."""
-
-        global REQ_SESSION
-
-        if use_session:
-            log.debug("Using turbo http session")
-            if REQ_SESSION is None:
-                REQ_SESSION = requests.Session()
-                adapter = requests.adapters.HTTPAdapter(pool_connections=100,
-                                                        pool_maxsize=100)
-                REQ_SESSION.mount('http://', adapter)
-                REQ_SESSION.keep_alive = True
-            req = REQ_SESSION
-        else:
-            req = requests
 
         try:
             log.info("Querying graphite uri: '%s'.", url)
-            resp = req.get(url)
+            resp = requests.get(url)
         except Exception as exc:
             log.error("Error sending request to graphite: %r", exc)
             raise GraphiteError(repr(exc))
