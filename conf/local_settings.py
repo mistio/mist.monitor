@@ -4,7 +4,7 @@
 DATABASES = {
     'default': {
         'NAME': 'graphite.db',
-        'ENGINE': 'django.db.backends.sqlite3',
+        'ENGINE': 'django.db.clouds.sqlite3',
         'USER': '',
         'PASSWORD': '',
         'HOST': '',

@@ -113,7 +113,7 @@ pg_blks			value:DERIVE:0:U
 pg_db_size		value:GAUGE:0:U
 pg_n_tup_c		value:DERIVE:0:U
 pg_n_tup_g		value:GAUGE:0:U
-pg_numbackends		value:GAUGE:0:U
+pg_numclouds		value:GAUGE:0:U
 pg_scan			value:DERIVE:0:U
 pg_xact			value:DERIVE:0:U
 ping_droprate		value:GAUGE:0:100

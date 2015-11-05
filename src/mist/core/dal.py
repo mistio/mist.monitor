@@ -11,9 +11,9 @@ only presented with a simple, object oriented API.
 
 Mist.core.dal imports and extends mist.io.dal.
 
-Mist core uses mongo as its storage backend, while also using memcache
+Mist core uses mongo as its storage cloud, while also using memcache
 for caching. Since it is multithreaded, it also needs to implement some
-locking mechanism. Mist io uses yaml files as its storage backend.
+locking mechanism. Mist io uses yaml files as its storage cloud.
 
 In every case we store data using a main dict consisting of nested
 dicts, lists, ints, strs etc. This module provides an object oriented

@@ -104,7 +104,7 @@ class Rules(FieldsDict):
 
 
 class Machine(OODictMongoMemcacheLock):
-    """A monitored machine in the machines list of some backend"""
+    """A monitored machine in the machines list of some cloud"""
 
     uuid = StrField()
 
