@@ -2,9 +2,9 @@
 
 CORE_URI = "http://172.17.42.102:30080/"
 # Almost all servers either run graphite locally or have a local graphite proxy
-GRAPHITE_URI = "http://graphite"
-MONGO_URI = "mongodb:27017"
-MEMCACHED_URI = ["memcached:11211"]
+GRAPHITE_URI = "http://graphite.default.svc.cluster.local"
+MONGO_URI = "mongodb.default.svc.cluster.local:27017"
+MEMCACHED_URI = ["memcached.default.svc.cluster.local:11211"]
 
 # Verify core's SSL certificate when communicating via HTTPS
 # (used by mist.alert when notifying core about rule status)
