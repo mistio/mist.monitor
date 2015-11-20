@@ -26,3 +26,4 @@ src/mist.alert/
 settings.py
 build/
 *.swp
+collect.passwd
