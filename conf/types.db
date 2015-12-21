@@ -108,7 +108,9 @@ node_rssi		value:GAUGE:0:255
 node_stat		value:DERIVE:0:U
 node_tx_rate		value:GAUGE:0:127
 operations		value:DERIVE:0:U
-percent			value:GAUGE:0:100.1
+percent         value:GAUGE:0:100.1
+percent_bytes       value:GAUGE:0:100.1
+percent_inodes      value:GAUGE:0:100.1
 pg_blks			value:DERIVE:0:U
 pg_db_size		value:GAUGE:0:U
 pg_n_tup_c		value:DERIVE:0:U
