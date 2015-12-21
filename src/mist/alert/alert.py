@@ -79,7 +79,7 @@ def notify_core(condition, value):
         'notification_level': condition.notification_level,
         'incident_id': condition.incident_id,
     }
-    resp = requests.put(config.CORE_URI + "/rules", params=params,
+    resp = requests.put(config.CORE_URI + "/rule_triggered", params=params,
                         verify=config.SSL_VERIFY)
     if not resp.ok:
         raise Exception(resp.text)
