@@ -50,7 +50,7 @@ redirect_stderr = false
 user = mist
 
 [program:alert]
-command = ${buildout:directory}/pypy-env/bin/pypy ${buildout:directory}/src/mist/alert/alert.py
+command = ${buildout:directory}/bin/mist-alert
 process_name = alert
 directory = ${buildout:directory}
 priority = 40
