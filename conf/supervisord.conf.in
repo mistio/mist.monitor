@@ -14,12 +14,12 @@ environment = LD_LIBRARY_PATH=${buildout:directory}/parts/mongo-c-driver/lib,PER
 [inet_http_server]
 port = 127.0.0.1:9010
 username = mistiera
-password = 
+password =
 
 [supervisorctl]
 serverurl = http://127.0.0.1:9010
 username = mistiera
-password = 
+password =
 
 [rpcinterface:supervisor]
 supervisor.rpcinterface_factory=supervisor.rpcinterface:make_main_rpcinterface
@@ -33,7 +33,7 @@ redirect_stderr = false
 user = mist
 
 [program:bucky]
-command = ${buildout:directory}/bin/bucky ${buildout:directory}/conf/bucky_conf.py
+command = ${buildout:directory}/pypy-env/bin/bucky ${buildout:directory}/conf/bucky_conf.py
 process_name = bucky
 directory = ${buildout:directory}
 priority = 15
@@ -50,7 +50,7 @@ redirect_stderr = false
 user = mist
 
 [program:alert]
-command = ${buildout:directory}/bin/mist-alert
+command = ${buildout:directory}/pypy-env/bin/pypy ${buildout:directory}/src/mist/alert/alert.py
 process_name = alert
 directory = ${buildout:directory}
 priority = 40

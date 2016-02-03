@@ -116,7 +116,7 @@ class OODictMongo(mist.io.dal.OODict):
 
     def save(self):
         """Save user data to mongo."""
-        self._get_mongo_coll().save(self._dict, safe=True)
+        self._get_mongo_coll().save(self._dict)
 
     def delete(self):
         """Delete user from mongo."""
@@ -124,7 +124,7 @@ class OODictMongo(mist.io.dal.OODict):
 
     def create(self):
         """Create user data to mongo."""
-        self._get_mongo_coll().save(self._dict, safe=True)
+        self._get_mongo_coll().save(self._dict)
         self._reinit(self._dict)
 
     def __del__(self):
