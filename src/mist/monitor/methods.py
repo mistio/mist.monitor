@@ -37,12 +37,15 @@ def update_collectd_conf():
 
     """
 
-    lines = ["%s: %s\n" % (machine.uuid, machine.collectd_password)
-             for machine in get_all_machines()]
-    with open(config.AUTH_FILE_PATH, "w") as f:
-        if CAN_LOCK:
+    path = config.AUTH_FILE_PATH
+    tmp_path = path + '.tmp'
+    with open(tmp_path, 'w') as f:  # write new auth file to temporary file
+        if CAN_LOCK:  # disallow concurrent rewrites of authfile
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-        f.writelines(lines)
+        f.writelines(["%s: %s\n" % (machine.uuid, machine.collectd_password)
+                      for machine in get_all_machines()])
+    os.rename(tmp_path, path)  # move tmp file to authfile location
+    os.utime(path, None)  # touch authfile to notify bucky that it changed
 
 
 def add_machine(uuid, password, update_collectd=True):
