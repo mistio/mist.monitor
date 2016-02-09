@@ -39,7 +39,7 @@ def update_collectd_conf():
 
     lines = ["%s: %s\n" % (machine.uuid, machine.collectd_password)
              for machine in get_all_machines()]
-    with open(os.getcwd() + "/conf/collectd.passwd", "w") as f:
+    with open(config.AUTH_FILE_PATH, "w") as f:
         if CAN_LOCK:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
         f.writelines(lines)
