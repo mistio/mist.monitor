@@ -37,7 +37,7 @@ def update_collectd_conf():
 
     """
 
-    path = os.path.join(os.getcwd(), 'conf/collectd.passwd')
+    path = config.AUTH_FILE_PATH
     tmp_path = path + '.tmp'
     with open(tmp_path, 'w') as f:  # write new auth file to temporary file
         if CAN_LOCK:  # disallow concurrent rewrites of authfile

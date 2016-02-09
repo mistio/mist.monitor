@@ -1,6 +1,7 @@
 """Parses user defined settings from settings.py in top level dir."""
 
 import logging
+import os
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ GRAPHITE_URI = settings.get("GRAPHITE_URI", "http://localhost")
 MONGO_URI = settings.get("MONGO_URI", "localhost:27022")
 MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
 
+AUTH_FILE_PATH = settings.get("AUTH_FILE_PATH", os.getcwd() + "/conf/collectd.passwd")
 
 # Verify core's SSL certificate when communicating via HTTPS
 # (used by mist.alert when notifying core about rule status)

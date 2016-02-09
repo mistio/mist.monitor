@@ -1,6 +1,6 @@
 """User defined settings"""
 
-CORE_URI = "http://172.17.42.102:30080/"
+CORE_URI = "http://192.168.64.2:30080"
 # Almost all servers either run graphite locally or have a local graphite proxy
 GRAPHITE_URI = "http://graphite.default.svc.cluster.local"
 MONGO_URI = "mongodb.default.svc.cluster.local:27017"
