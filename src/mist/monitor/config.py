@@ -2,6 +2,7 @@
 
 import logging
 import os
+import ast
 import etcd
 
 log = logging.getLogger(__name__)
