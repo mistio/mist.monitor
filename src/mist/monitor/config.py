@@ -46,7 +46,7 @@ def etcd_get(client, key, default_value, type='string'):
 
 if ETCD_BACKEND:
     if ETCD_BACKEND in ["gce", "gke", "GKE", "GCE"]:
-        ETCD_URI = "etcd.default.svc.cluster.local"
+        ETCD_URI = "etcd"
     else:
         ETCD_URI = get_default_gateway_ip()
     try:
@@ -61,9 +61,9 @@ else:
 
 if ETCD_EXISTS:
     CORE_URI = etcd_get(client, 'CORE_URI', "http://localhost:8000")
-    GRAPHITE_URI = etcd_get(client, 'GRAPHITE_URI', "http://graphite.default.svc.cluster.local")
-    MONGO_URI = etcd_get(client, 'MONGO_URI', "mongodb.default.svc.cluster.local:27017")
-    MEMCACHED_URI = etcd_get(client, 'MEMCACHED_URI', ["memcached.default.svc.cluster.local:11211"], type='list')
+    GRAPHITE_URI = etcd_get(client, 'GRAPHITE_URI', "http://graphite")
+    MONGO_URI = etcd_get(client, 'MONGO_URI', "mongodb:27017")
+    MEMCACHED_URI = etcd_get(client, 'MEMCACHED_URI', ["memcached:11211"], type='list')
     SSL_VERIFY = etcd_get(client, 'SSL_VERIFY', False, type='boolean')
     AUTH_FILE_PATH = etcd_get(client, 'AUTH_FILE_PATH', "/opt/mist/collectd.passwd")
 else:
