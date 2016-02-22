@@ -1,9 +1,21 @@
 """Parses user defined settings from settings.py in top level dir."""
+import socket
+import fcntl
+import struct
 
 import logging
 import os
 
 log = logging.getLogger(__name__)
+
+
+def get_ip_address(ifname):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', ifname[:15])
+    )[20:24])
 
 
 # Parse user defined settings from settings.py in the top level project dir
@@ -16,10 +28,10 @@ except Exception as exc:
     log.error("Error parsing settings py: %r", exc)
 
 
-CORE_URI = settings.get("CORE_URI", "https://mist.io")
+CORE_URI = settings.get("CORE_URI", "http://%s" % get_ip_address('eth0'))
 # Almost all servers either run graphite locally or have a local graphite proxy
-GRAPHITE_URI = settings.get("GRAPHITE_URI", "http://localhost")
-MONGO_URI = settings.get("MONGO_URI", "localhost:27022")
+GRAPHITE_URI = settings.get("GRAPHITE_URI", "http://localhost:9000")
+MONGO_URI = settings.get("MONGO_URI", "localhost")
 MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
 
 AUTH_FILE_PATH = settings.get("AUTH_FILE_PATH", os.getcwd() + "/conf/collectd.passwd")
