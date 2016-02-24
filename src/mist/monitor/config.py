@@ -28,7 +28,7 @@ except Exception as exc:
     log.error("Error parsing settings py: %r", exc)
 
 
-CORE_URI = settings.get("CORE_URI", "http://%s" % get_ip_address('eth0'))
+CORE_URI = settings.get("CORE_URI", os.environ.get("CORE_URI", "http://%s" % get_ip_address('eth0')))
 # Almost all servers either run graphite locally or have a local graphite proxy
 GRAPHITE_URI = settings.get("GRAPHITE_URI", "http://localhost:9000")
 MONGO_URI = settings.get("MONGO_URI", "localhost")
