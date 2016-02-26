@@ -28,13 +28,18 @@ except Exception as exc:
     log.error("Error parsing settings py: %r", exc)
 
 
-CORE_URI = settings.get("CORE_URI", os.environ.get("CORE_URI", "http://%s" % get_ip_address('eth0')))
+CORE_URI = settings.get("CORE_URI",
+                        os.environ.get("CORE_URI", "https://mist.io"))
 # Almost all servers either run graphite locally or have a local graphite proxy
-GRAPHITE_URI = settings.get("GRAPHITE_URI", "http://localhost:9000")
-MONGO_URI = settings.get("MONGO_URI", "localhost")
+GRAPHITE_URI = settings.get("GRAPHITE_URI",
+                            os.environ.get("GRAPHITE_URI", "http://localhost"))
+MONGO_URI = settings.get("MONGO_URI",
+                         os.environ.get("MONGO_URI", "localhost:27022"))
 MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
 
-AUTH_FILE_PATH = settings.get("AUTH_FILE_PATH", os.getcwd() + "/conf/collectd.passwd")
+AUTH_FILE_PATH = settings.get("AUTH_FILE_PATH",
+                              os.environ.get("AUTH_FILE_PATH",
+                                      os.getcwd() + "/conf/collectd.passwd"))
 
 # Verify core's SSL certificate when communicating via HTTPS
 # (used by mist.alert when notifying core about rule status)
