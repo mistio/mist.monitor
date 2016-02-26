@@ -1,5 +1,4 @@
 """Parses user defined settings from settings.py in top level dir."""
-
 import logging
 import os
 import ast
@@ -67,12 +66,19 @@ if ETCD_EXISTS:
     SSL_VERIFY = etcd_get(client, 'SSL_VERIFY', False, type='boolean')
     AUTH_FILE_PATH = etcd_get(client, 'AUTH_FILE_PATH', "/opt/mist/collectd.passwd")
 else:
-    CORE_URI = settings.get("CORE_URI", "https://mist.io")
-    GRAPHITE_URI = settings.get("GRAPHITE_URI", "http://localhost")
-    MONGO_URI = settings.get("MONGO_URI", "localhost:27022")
+    CORE_URI = settings.get("CORE_URI",
+                            os.environ.get("CORE_URI", "https://mist.io"))
+    GRAPHITE_URI = settings.get("GRAPHITE_URI",
+                                os.environ.get("GRAPHITE_URI",
+                                               "http://localhost"))
+    MONGO_URI = settings.get("MONGO_URI",
+                             os.environ.get("MONGO_URI", "localhost:27022"))
     MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
     SSL_VERIFY = settings.get("SSL_VERIFY", True)
-    AUTH_FILE_PATH = settings.get("AUTH_FILE_PATH", os.getcwd() + "/conf/collectd.passwd")
+    AUTH_FILE_PATH = settings.get(
+        "AUTH_FILE_PATH",
+        os.environ.get("AUTH_FILE_PATH", os.getcwd() + "/conf/collectd.passwd")
+    )
 
 # Defines timings of notifications sent to core from mist.alert when a rule
 # is triggered. (When untriggered we always send a single notification right
