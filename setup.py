@@ -22,6 +22,7 @@ requires = [
     'python-memcached',
     'pyyaml',
     'bucky',
+    'python-etcd'
 ]
 
 setup(
