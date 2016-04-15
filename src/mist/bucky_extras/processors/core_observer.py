@@ -31,7 +31,7 @@ class NewMetricsObserver(object):
                     line = line.strip()
                     parts = line.split()
                     if len(parts) == 2:
-                        host, name = parts
+                        host, name = map(str.strip, parts)
                         self.metrics.add((host, name))
                     else:
                         log.error("Invalid line in '%s': '%s'", path, line)
