@@ -96,12 +96,15 @@ def add_rule(request):
     rule_id = request.matchdict['rule']
 
     params = request.json_body
-    for key in ["metric", "operator", "value"]:
+    for key in ["metric", "operator"]:
         if not params.get(key):
             raise RequiredParameterMissingError(key)
     metric = params["metric"]
     operator = params["operator"]
-    value = params["value"]
+    try:
+        value = float(params["value"])
+    except (ValueError, TypeError):
+        raise BadRequestError("Invalid value type %r" % value)
     reminder_list = params.get("reminder_list")
     reminder_offset = params.get("reminder_offset")
     aggregate = params.get("aggregate")
