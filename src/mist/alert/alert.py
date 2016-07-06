@@ -6,6 +6,7 @@ from multiprocessing.pool import ThreadPool
 
 
 from mist.monitor.model import get_all_machines
+from mist.monitor.methods import remove_rule
 
 from mist.monitor.graphite import MultiHandler
 
@@ -82,6 +83,8 @@ def notify_core(condition, value):
     resp = requests.put(config.CORE_URI + "/rule_triggered", params=params,
                         verify=config.SSL_VERIFY)
     if not resp.ok:
+        if resp.status_code == 404:
+            remove_rule(condition.uuid, condition.rule_id)
         raise Exception(resp.text)
 
 
