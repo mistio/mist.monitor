@@ -123,21 +123,18 @@ def remove_rule(request):
     return OK
 
 
-@view_config(route_name='stats', request_method='GET', renderer='json')
-def get_stats(request):
-    """Returns all stats for a machine, the client will draw them."""
-
-    uuid = request.matchdict['machine']
+def _parse_get_stats_params(request):
     try:
         params = request.json_body
-        metrics = params.get('metrics')
+        metrics = params.get('metrics', [])
+        uuids = params.get('uuids', [])
     except:
         params = request.params
-        metrics = params.getall('metric')
+        metrics = params.getall('metric', [])
+        uuids = params.getall('uuid', [])
     start = params.get('start')
     stop = params.get('stop')
     interval_str = str(params.get('step', ''))
-
     if re.match("^[0-9]+(\.[0-9]+)?$", interval_str):
         seconds = int(interval_str)
         log.info('seconds: %d', seconds)
@@ -154,8 +151,23 @@ def get_stats(request):
                 log.info('step is ok')
                 break
         interval_str = "%ssec" % seconds
+    return uuids, metrics, start, stop, interval_str
 
+
+@view_config(route_name='stats', request_method='GET', renderer='json')
+def get_stats(request):
+    """Returns all stats for a machine, the client will draw them."""
+
+    uuid = request.matchdict['machine']
+    _, metrics, start, stop, interval_str = _parse_get_stats_params(request)
     return methods.get_stats(uuid, metrics, start, stop, interval_str)
+
+
+@view_config(route_name='load', request_method='GET', renderer='json')
+def get_load(request):
+    """Returns shortterm load for many machines"""
+    uuids, _, start, stop, interval_str = _parse_get_stats_params(request)
+    return methods.get_load(uuids, start, stop, interval_str)
 
 
 @view_config(route_name='find_metrics', request_method='GET', renderer='json')

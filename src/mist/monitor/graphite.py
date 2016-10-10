@@ -16,7 +16,13 @@ log = logging.getLogger(__name__)
 
 
 def summarize(series, interval, function="avg"):
-    return "summarize(%s,'%s','%s')" % (series, interval, function)
+    return r"""
+aliasSub(
+summarize(%(series)s, '%(interval)s', '%(function)s'),
+'summarize\((.*), "%(interval)s", "%(function)s"\)',
+"\1"
+)""".replace('\n', '') % {'series': series, 'interval': interval,
+                          'function': function}
 
 
 def sum_series(series_list):
@@ -58,9 +64,9 @@ class GenericHandler(object):
                 _target = target
                 if interval_str:
                     target = summarize(target, interval_str)
-                if _alias != _target or interval_str:
-                    # if alias different than target, or summarize() added to
-                    # target, use alias to not screw with the return target
+                if _alias != _target:
+                    # if alias different than target use alias to not screw
+                    # with the return target
                     target = alias(target, _alias)
                 real_to_requested[_alias] = requested_target
                 clean_targets.append(target % {'head': self.head()})
@@ -134,7 +140,8 @@ class GenericHandler(object):
     def target_alias(self, name):
         """Given a metric identifier, return the correct target and alias"""
         target = name.replace("%s." % self.head(), "%(head)s.")
-        if "%(head)s." not in target:
+        # if "%(head)s." not in target:
+        if not target.startswith('%(head)s.'):
             target = "%(head)s." + target
         return target, target
 
@@ -425,14 +432,18 @@ class CpuHandler(CustomHandler):
         if parts is not None:
             core, kind = parts
             if core == "total":
-                if kind != "nonidle":
-                    base_target = "%(head)s.cpu.*." + kind
+                if kind == "*":
+                    target = r'aliasSub(asPercent(sumSeriesWithWildcards(exclude(%(head)s.cpu.*.*,"idle"),3),sumSeries(%(head)s.cpu.*.*)), "^.*\.cpu\.([a-z]*),.*", "%(head)s.cpu.total.\1")'
+                    alias = target
                 else:
-                    base_target = exclude("%(head)s.cpu.*.*", "idle")
-                target = as_percent(
-                    sum_series(base_target),
-                    sum_series("%(head)s.cpu.*.*")
-                )
+                    if kind != "nonidle":
+                        base_target = "%(head)s.cpu.*." + kind
+                    else:
+                        base_target = exclude("%(head)s.cpu.*.*", "idle")
+                    target = as_percent(
+                        sum_series(base_target),
+                        sum_series("%(head)s.cpu.*.*")
+                    )
         return target, alias
 
 

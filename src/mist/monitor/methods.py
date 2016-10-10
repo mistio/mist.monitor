@@ -4,6 +4,8 @@ import logging
 from subprocess import call
 from time import time
 
+import requests
+
 log = logging.getLogger(__name__)
 
 try:
@@ -28,6 +30,7 @@ from mist.monitor.exceptions import MachineNotFoundError
 from mist.monitor.exceptions import RuleNotFoundError
 from mist.monitor.exceptions import MachineExistsError
 from mist.monitor.exceptions import BadRequestError
+from mist.monitor.exceptions import GraphiteError
 
 
 def update_collectd_conf():
@@ -186,6 +189,23 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
     for item in data:
         if item['alias'].rfind("%(head)s.") == 0:
             item['alias'] = item['alias'][9:]
+    return data
+
+
+def get_load(uuids, start="", stop="", interval_str=""):
+    target = 'bucky.{%s}.load.shortterm' % (','.join(uuids), )
+    if interval_str:
+        target = graphite.summarize(target, interval_str)
+    params = [('target', target),
+              ('from', start or None),
+              ('until', stop or None),
+              ('format', 'json')]
+    resp = requests.get('%s/render' % config.GRAPHITE_URI, params=params)
+    if not resp.ok:
+        raise GraphiteError(str(resp))
+    data = resp.json()
+    for item in data:
+        item['uuid'] = item['target'].split('.')[1]
     return data
 
 
