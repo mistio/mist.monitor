@@ -140,7 +140,8 @@ class GenericHandler(object):
     def target_alias(self, name):
         """Given a metric identifier, return the correct target and alias"""
         target = name.replace("%s." % self.head(), "%(head)s.")
-        if "%(head)s." not in target:
+        # if "%(head)s." not in target:
+        if not target.startswith('%(head)s.'):
             target = "%(head)s." + target
         return target, target
 
