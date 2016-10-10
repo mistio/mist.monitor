@@ -16,7 +16,13 @@ log = logging.getLogger(__name__)
 
 
 def summarize(series, interval, function="avg"):
-    return "summarize(%s,'%s','%s')" % (series, interval, function)
+    return r"""
+aliasSub(
+summarize(%(series)s, '%(interval)s', '%(function)s'),
+'summarize\((.*), "%(interval)s", "%(function)s"\)',
+"\1"
+)""".replace('\n', '') % {'series': series, 'interval': interval,
+                          'function': function}
 
 
 def sum_series(series_list):
