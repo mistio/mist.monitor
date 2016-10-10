@@ -64,9 +64,9 @@ class GenericHandler(object):
                 _target = target
                 if interval_str:
                     target = summarize(target, interval_str)
-                if _alias != _target or interval_str:
-                    # if alias different than target, or summarize() added to
-                    # target, use alias to not screw with the return target
+                if _alias != _target:
+                    # if alias different than target use alias to not screw
+                    # with the return target
                     target = alias(target, _alias)
                 real_to_requested[_alias] = requested_target
                 clean_targets.append(target % {'head': self.head()})
@@ -431,14 +431,18 @@ class CpuHandler(CustomHandler):
         if parts is not None:
             core, kind = parts
             if core == "total":
-                if kind != "nonidle":
-                    base_target = "%(head)s.cpu.*." + kind
+                if kind == "*":
+                    target = r'aliasSub(asPercent(sumSeriesWithWildcards(exclude(%(head)s.cpu.*.*,"idle"),3),sumSeries(%(head)s.cpu.*.*)), "^.*\.cpu\.([a-z]*),.*", "%(head)s.cpu.total.\1")'
+                    alias = target
                 else:
-                    base_target = exclude("%(head)s.cpu.*.*", "idle")
-                target = as_percent(
-                    sum_series(base_target),
-                    sum_series("%(head)s.cpu.*.*")
-                )
+                    if kind != "nonidle":
+                        base_target = "%(head)s.cpu.*." + kind
+                    else:
+                        base_target = exclude("%(head)s.cpu.*.*", "idle")
+                    target = as_percent(
+                        sum_series(base_target),
+                        sum_series("%(head)s.cpu.*.*")
+                    )
         return target, alias
 
 
