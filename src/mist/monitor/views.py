@@ -130,8 +130,8 @@ def _parse_get_stats_params(request):
         uuids = params.get('uuids', [])
     except:
         params = request.params
-        metrics = params.getall('metric', [])
-        uuids = params.getall('uuid', [])
+        metrics = params.getall('metric')
+        uuids = params.getall('uuid')
     start = params.get('start')
     stop = params.get('stop')
     interval_str = str(params.get('step', ''))
