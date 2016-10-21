@@ -1,3 +1,4 @@
 [submodule "src/bucky"]
 	path = src/bucky
-	url = https://github.com/dimrozakis/bucky
+	url = https://gitlab.ops.mist.io/mistio/bucky
+
