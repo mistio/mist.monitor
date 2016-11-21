@@ -8,77 +8,29 @@ log = logging.getLogger(__name__)
 
 
 # Parse user defined settings from settings.py in the top level project dir
+settings_file = os.getenv('MONITOR_SETTINGS_FILE') or 'settings.py'
 settings = {}
 try:
-    execfile("settings.py", settings)
+    execfile(settings_file, settings)
 except IOError:
-    log.warning("No settings.py file found.")
+    log.warning("No %s file found." % settings_file)
 except Exception as exc:
     log.error("Error parsing settings py: %r", exc)
 
-ETCD_BACKEND = os.getenv('ETCD_BACKEND') or settings.get('ETCD_BACKEND')
 
-def get_default_gateway_ip():
-    with open("/proc/net/route") as fh:
-        for line in fh:
-            fields = line.strip().split()
-            if fields[1] != '00000000' or not int(fields[3], 16) & 2:
-                continue
-
-            return socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
-
-def etcd_get(client, key, default_value, type='string'):
-    try:
-        key = client.read('/mist/settings/%s' % key).value
-        if type is 'string':
-            key = str(key)
-        elif type is 'integer':
-            key = int(key)
-        elif type is 'boolean':
-            key = ast.literal_eval(key)
-        elif type is 'list':
-            key = [key]
-    except etcd.EtcdKeyNotFound:
-        key = default_value
-
-    return key
-
-if ETCD_BACKEND:
-    if ETCD_BACKEND in ["gce", "gke", "GKE", "GCE"]:
-        ETCD_URI = "etcd"
-    else:
-        ETCD_URI = get_default_gateway_ip()
-    try:
-        client = etcd.Client(ETCD_URI, port=2379)
-        machines = client.machines
-        ETCD_EXISTS = True
-    except:
-        ETCD_EXISTS = False
-        pass
-else:
-    ETCD_EXISTS = False
-
-if ETCD_EXISTS:
-    CORE_URI = etcd_get(client, 'CORE_URI', "http://localhost:8000")
-    GRAPHITE_URI = etcd_get(client, 'GRAPHITE_URI', "http://graphite")
-    MONGO_URI = etcd_get(client, 'MONGO_URI', "mongodb:27017")
-    MEMCACHED_URI = etcd_get(client, 'MEMCACHED_URI', ["memcached:11211"], type='list')
-    SSL_VERIFY = etcd_get(client, 'SSL_VERIFY', False, type='boolean')
-    AUTH_FILE_PATH = etcd_get(client, 'AUTH_FILE_PATH', "/opt/mist/collectd.passwd")
-else:
-    CORE_URI = settings.get("CORE_URI",
-                            os.environ.get("CORE_URI", "https://mist.io"))
-    GRAPHITE_URI = settings.get("GRAPHITE_URI",
-                                os.environ.get("GRAPHITE_URI",
-                                               "http://localhost"))
-    MONGO_URI = settings.get("MONGO_URI",
-                             os.environ.get("MONGO_URI", "localhost:27022"))
-    MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
-    SSL_VERIFY = settings.get("SSL_VERIFY", True)
-    AUTH_FILE_PATH = settings.get(
-        "AUTH_FILE_PATH",
-        os.environ.get("AUTH_FILE_PATH", os.getcwd() + "/conf/collectd.passwd")
-    )
+CORE_URI = settings.get("CORE_URI",
+                        os.environ.get("CORE_URI", "https://mist.io"))
+GRAPHITE_URI = settings.get("GRAPHITE_URI",
+                            os.environ.get("GRAPHITE_URI",
+                                           "http://localhost"))
+MONGO_URI = settings.get("MONGO_URI",
+                         os.environ.get("MONGO_URI", "localhost:27022"))
+MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
+SSL_VERIFY = settings.get("SSL_VERIFY", True)
+AUTH_FILE_PATH = settings.get(
+    "AUTH_FILE_PATH",
+    os.environ.get("AUTH_FILE_PATH", os.getcwd() + "/conf/collectd.passwd")
+)
 
 # Defines timings of notifications sent to core from mist.alert when a rule
 # is triggered. (When untriggered we always send a single notification right
