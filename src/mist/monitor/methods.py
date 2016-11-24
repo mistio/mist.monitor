@@ -204,9 +204,12 @@ def get_load(uuids, start="", stop="", interval_str=""):
     if not resp.ok:
         raise GraphiteError(str(resp))
     data = resp.json()
+    ret = {}
     for item in data:
-        item['uuid'] = item['target'].split('.')[1]
-    return data
+        uuid = item['target'].split('.')[1]
+        item['name'] = uuid
+        ret[uuid] = item
+    return ret
 
 
 def find_metrics(uuid):
