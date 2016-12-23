@@ -19,17 +19,17 @@ except Exception as exc:
 
 
 CORE_URI = settings.get("CORE_URI",
-                        os.environ.get("CORE_URI", "https://mist.io"))
+                        os.environ.get("CORE_URI", "http://mist"))
 GRAPHITE_URI = settings.get("GRAPHITE_URI",
                             os.environ.get("GRAPHITE_URI",
-                                           "http://localhost"))
+                                           "http://graphite"))
 MONGO_URI = settings.get("MONGO_URI",
-                         os.environ.get("MONGO_URI", "localhost:27022"))
-MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
-SSL_VERIFY = settings.get("SSL_VERIFY", True)
+                         os.environ.get("MONGO_URI", "mongodb:27017"))
+MEMCACHED_URI = settings.get("MEMCACHED_URI", ["memcached:11211"])
+SSL_VERIFY = settings.get("SSL_VERIFY", False)
 AUTH_FILE_PATH = settings.get(
     "AUTH_FILE_PATH",
-    os.environ.get("AUTH_FILE_PATH", os.getcwd() + "/conf/collectd.passwd")
+    os.environ.get("AUTH_FILE_PATH", os.getcwd() + "/opt/mist/collectd.passwd")
 )
 
 # Defines timings of notifications sent to core from mist.alert when a rule
