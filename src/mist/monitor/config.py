@@ -29,7 +29,7 @@ MEMCACHED_URI = settings.get("MEMCACHED_URI", ["memcached:11211"])
 SSL_VERIFY = settings.get("SSL_VERIFY", False)
 AUTH_FILE_PATH = settings.get(
     "AUTH_FILE_PATH",
-    os.environ.get("AUTH_FILE_PATH", os.getcwd() + "/opt/mist/collectd.passwd")
+    os.environ.get("AUTH_FILE_PATH", "/opt/mist/collectd.passwd")
 )
 
 # Defines timings of notifications sent to core from mist.alert when a rule
