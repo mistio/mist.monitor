@@ -25,8 +25,8 @@ GRAPHITE_URI = settings.get("GRAPHITE_URI",
                                            "http://localhost"))
 MONGO_URI = settings.get("MONGO_URI",
                          os.environ.get("MONGO_URI", "localhost:27022"))
-MEMCACHED_URI = settings.get("MEMCACHED_URI", ["localhost:11211"])
-SSL_VERIFY = settings.get("SSL_VERIFY", True)
+MEMCACHED_URI = settings.get("MEMCACHED_URI", [os.environ.get("MEMCACHED_URI", "localhost:11211")])
+SSL_VERIFY = settings.get("SSL_VERIFY", False)
 AUTH_FILE_PATH = settings.get(
     "AUTH_FILE_PATH",
     os.environ.get("AUTH_FILE_PATH", os.getcwd() + "/conf/collectd.passwd")
