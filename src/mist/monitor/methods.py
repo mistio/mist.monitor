@@ -192,8 +192,7 @@ def get_stats(uuid, metrics, start="", stop="", interval_str=""):
     return data
 
 
-def get_load(uuids, start="", stop="", interval_str=""):
-    target = 'bucky.{%s}.load.shortterm' % (','.join(uuids), )
+def get_multi(target, start="", stop="", interval_str=""):
     if interval_str:
         target = graphite.summarize(target, interval_str)
     params = [('target', target),
@@ -202,11 +201,29 @@ def get_load(uuids, start="", stop="", interval_str=""):
               ('format', 'json')]
     resp = requests.get('%s/render' % config.GRAPHITE_URI, params=params)
     if not resp.ok:
+        log.error(resp.text)
         raise GraphiteError(str(resp))
-    data = resp.json()
+    return resp.json()
+
+
+def get_load(uuids, start="", stop="", interval_str=""):
+    data = get_multi('bucky.{%s}.load.shortterm' % (','.join(uuids), ),
+                     start, stop, interval_str)
     ret = {}
     for item in data:
         uuid = item['target'].split('.')[1]
+        item['name'] = uuid
+        ret[uuid] = item
+    return ret
+
+
+def get_cores(uuids, start="", stop="", interval_str=""):
+    target = 'groupByNode(bucky.{%s}.cpu.*.system,1,"countSeries")' % (
+        ','.join(uuids), )
+    data = get_multi(target, start, stop, interval_str)
+    ret = {}
+    for item in data:
+        uuid = item['target']
         item['name'] = uuid
         ret[uuid] = item
     return ret
