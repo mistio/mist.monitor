@@ -151,6 +151,8 @@ def _parse_get_stats_params(request):
                 log.info('step is ok')
                 break
         interval_str = "%ssec" % seconds
+    elif re.match("^[0-9]+m$", interval_str):
+        interval_str += 'in'
     return uuids, metrics, start, stop, interval_str
 
 
@@ -168,6 +170,13 @@ def get_load(request):
     """Returns shortterm load for many machines"""
     uuids, _, start, stop, interval_str = _parse_get_stats_params(request)
     return methods.get_load(uuids, start, stop, interval_str)
+
+
+@view_config(route_name='cores', request_method='GET', renderer='json')
+def get_cores(request):
+    """Returns number of cores for many machines"""
+    uuids, _, start, stop, interval_str = _parse_get_stats_params(request)
+    return methods.get_cores(uuids, start, stop, interval_str)
 
 
 @view_config(route_name='find_metrics', request_method='GET', renderer='json')
