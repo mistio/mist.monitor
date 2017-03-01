@@ -37,7 +37,7 @@ from memcache import Client as MemcacheClient
 
 
 import mist.io.dal
-from mist.core import config
+from mist.io import config
 
 
 log = logging.getLogger(__name__)
