@@ -5,7 +5,7 @@ stages:
   stage: build
   before_script:
     - git submodule sync --recursive
-    - git submodule update --init --recursive bucky
+    - git submodule update --init --recursive src/bucky
     # Loging with gcr.io
     - docker login --username "$DOCKER_USERNAME" -u _json_key -p "$KEYFILE_JSON" https://gcr.io
   tags:
