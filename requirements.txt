@@ -1,0 +1,15 @@
+Twisted==11.1.0
+django==1.5.7
+whisper==0.9.12
+PasteScript==2.0.2
+requests==2.7.0
+pymongo==2.5
+pyramid==1.4
+python-memcached==1.57
+PyYAML==3.11
+django-tagging==0.3.2
+python-etcd==0.4.3
+six
+pycrypto
+watchdog
+
