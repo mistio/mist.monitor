@@ -3,11 +3,8 @@ stages:
 
 .docker_build_template: &docker_build_template
   stage: build
-  before_script:
-    - git submodule sync --recursive
-    - git submodule update --init --recursive src/bucky
-    # Loging with gcr.io
-    - docker login --username "$DOCKER_USERNAME" -u _json_key -p "$KEYFILE_JSON" https://gcr.io
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
   tags:
     - builder
   dependencies: []

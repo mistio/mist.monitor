@@ -13,17 +13,17 @@ RUN pip install --no-cache-dir -r /mist.monitor/requirements.txt
 
 COPY . /mist.monitor
 
+RUN cp /mist.monitor/containers/monitor/bucky_conf.py /bucky_conf.py
+
+RUN cp /mist.monitor/containers/monitor/uwsgi.ini /uwsgi.ini
+
+RUN cp /mist.monitor/containers/monitor/settings.monitor /mist.monitor/settings.py
+
+RUN cp /mist/.monitor/containers/monitor/supervisord.conf /etc/supervisord.conf
+
 RUN pip install -e /mist.monitor/src/bucky && \
     pip install -e /mist.monitor && \
     mkdir -p /opt/mist
-
-COPY containers/monitor/bucky_conf.py /bucky_conf.py
-
-COPY containers/monitor/uwsgi.ini /uwsgi.ini
-
-COPY containers/monitor/settings.monitor /mist.monitor/settings.py
-
-COPY containers/monitor/supervisord.conf /etc/supervisord.conf
 
 EXPOSE 80
 
