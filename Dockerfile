@@ -19,7 +19,7 @@ RUN cp /mist.monitor/containers/monitor/uwsgi.ini /uwsgi.ini
 
 RUN cp /mist.monitor/containers/monitor/settings.monitor /mist.monitor/settings.py
 
-RUN cp /mist/.monitor/containers/monitor/supervisord.conf /etc/supervisord.conf
+RUN cp /mist.monitor/containers/monitor/supervisord.conf /etc/supervisord.conf
 
 RUN pip install -e /mist.monitor/src/bucky && \
     pip install -e /mist.monitor && \
