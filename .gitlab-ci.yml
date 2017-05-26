@@ -1,0 +1,39 @@
+stages:
+  - build
+
+.docker_build_template: &docker_build_template
+  stage: build
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+  tags:
+    - builder
+  dependencies: []
+
+build_monitor_image:
+  <<: *docker_build_template
+  script:
+    - docker build --rm -t gcr.io/mist-ops/monitor:$CI_COMMIT_SHA .
+    - docker tag gcr.io/mist-ops/monitor:$CI_COMMIT_SHA gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG
+    - docker push gcr.io/mist-ops/monitor:$CI_COMMIT_SHA
+    - docker push gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG
+
+#################### MANUAL BUILDS ####################
+
+monitor_manual_build:
+  <<: *docker_build_template
+  when: manual
+  script:
+    - docker build --rm -t gcr.io/mist-ops/monitor:$CI_COMMIT_SHA .
+    - docker tag gcr.io/mist-ops/monitor:$CI_COMMIT_SHA gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG
+    - docker push gcr.io/mist-ops/monitor:$CI_COMMIT_SHA
+    - docker push gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG
+
+graphite_manual_build:
+  <<: *docker_build_template
+  when: manual
+  script:
+    - cd containers/graphite
+    - docker build --rm -t gcr.io/mist-ops/graphite:$CI_COMMIT_SHA .
+    - docker tag gcr.io/mist-ops/graphite:$CI_COMMIT_SHA gcr.io/mist-ops/graphite:$CI_COMMIT_REF_SLUG
+    - docker push gcr.io/mist-ops/graphite:$CI_COMMIT_SHA
+    - docker push gcr.io/mist-ops/graphite:$CI_COMMIT_REF_SLUG

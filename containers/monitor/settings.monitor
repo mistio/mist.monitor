@@ -1,0 +1,7 @@
+CORE_URI = "https://lifeofbrian.ops.mist.io"
+GRAPHITE_URI = "http://graphite"
+MONGO_URI = "mongodb:27017"
+MEMCACHED_URI = ["memcached:11211"]
+
+SSL_VERIFY = False
+AUTH_FILE_PATH = "/opt/mist/collectd.passwd"
