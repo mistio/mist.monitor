@@ -14,8 +14,12 @@ build_monitor_image:
   script:
     - docker build --rm -t gcr.io/mist-ops/monitor:$CI_COMMIT_SHA .
     - docker tag gcr.io/mist-ops/monitor:$CI_COMMIT_SHA gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG
+    - docker tag gcr.io/mist-ops/monitor:$CI_COMMIT_SHA mist/monitor:$CI_COMMIT_SHA
+    - docker tag gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG mist/monitor:$CI_COMMIT_REF_SLUG
     - docker push gcr.io/mist-ops/monitor:$CI_COMMIT_SHA
     - docker push gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG
+    - docker push mist/monitor:$CI_COMMIT_SHA
+    - docker push mist/monitor:$CI_COMMIT_REF_SLUG
 
 #################### MANUAL BUILDS ####################
 
@@ -25,8 +29,12 @@ monitor_manual_build:
   script:
     - docker build --rm -t gcr.io/mist-ops/monitor:$CI_COMMIT_SHA .
     - docker tag gcr.io/mist-ops/monitor:$CI_COMMIT_SHA gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG
+    - docker tag gcr.io/mist-ops/monitor:$CI_COMMIT_SHA mist/monitor:$CI_COMMIT_SHA
+    - docker tag gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG mist/monitor:$CI_COMMIT_REF_SLUG
     - docker push gcr.io/mist-ops/monitor:$CI_COMMIT_SHA
     - docker push gcr.io/mist-ops/monitor:$CI_COMMIT_REF_SLUG
+    - docker push mist/monitor:$CI_COMMIT_SHA
+    - docker push mist/monitor:$CI_COMMIT_REF_SLUG
 
 graphite_manual_build:
   <<: *docker_build_template
@@ -35,5 +43,9 @@ graphite_manual_build:
     - cd containers/graphite
     - docker build --rm -t gcr.io/mist-ops/graphite:$CI_COMMIT_SHA .
     - docker tag gcr.io/mist-ops/graphite:$CI_COMMIT_SHA gcr.io/mist-ops/graphite:$CI_COMMIT_REF_SLUG
+    - docker tag gcr.io/mist-ops/graphite:$CI_COMMIT_SHA mist/graphite:$CI_COMMIT_SHA
+    - docker tag gcr.io/mist-ops/graphite:$CI_COMMIT_REF_SLUG mist/graphite:$CI_COMMIT_REF_SLUG
     - docker push gcr.io/mist-ops/graphite:$CI_COMMIT_SHA
     - docker push gcr.io/mist-ops/graphite:$CI_COMMIT_REF_SLUG
+    - docker push mist/graphite:$CI_COMMIT_SHA
+    - docker push mist/graphite:$CI_COMMIT_REF_SLUG
