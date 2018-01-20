@@ -1,6 +1,3 @@
-Twisted==11.1.0
-whisper
-carbon
-django==1.5.7
-django-tagging==0.3.2
-git+https://github.com/dimrozakis/graphite-web.git@0.9.12.mistio
+whisper==1.1.1
+carbon==1.1.1
+graphite-web==1.1.1
